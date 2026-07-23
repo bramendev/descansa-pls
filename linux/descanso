@@ -55,6 +55,31 @@ def parse_time(t_str, day):
     h, m = t_str.split(':')
     return datetime(day.year, day.month, day.day, int(h), int(m))
 
+STATS_FILE = CONFIG_DIR / 'stats.json'
+
+def load_stats():
+    try:
+        if STATS_FILE.exists():
+            with open(STATS_FILE) as f:
+                return json.load(f)
+    except Exception:
+        pass
+    return {}
+
+def stats_summary(stats):
+    from datetime import date
+    today = date.today().isoformat()
+    parts = []
+    for modo, label in [('visual', 'visuales'), ('activo', 'activas'),
+                         ('almuerzo', 'almuerzos'), ('dormir', 'dormir')]:
+        if modo in stats:
+            s = stats[modo]
+            t = s['today'] if s.get('date') == today else 0
+            tot = s['total']
+            if t > 0 or tot > 0:
+                parts.append(f"{t} {label} (total {tot})")
+    return parts
+
 def main():
     config = load_config()
     vi = config['visual_interval_min'] * 60
@@ -67,14 +92,20 @@ def main():
 
     animal = config['animal']
     music = config['music_url']
+    stats = load_stats()
 
     print("── Descanso Visual ──")
-    print(f"  Visual:  cada {config['visual_interval_min']} min  ({config['visual_duration_sec']}s)")
-    print(f"  Activo:  cada {config['active_interval_min']} min  ({config['active_duration_sec']}s)")
+    print(f"  Visual:   cada {config['visual_interval_min']} min  ({config['visual_duration_sec']}s)")
+    print(f"  Activo:   cada {config['active_interval_min']} min  ({config['active_duration_sec']}s)")
     print(f"  Almuerzo: {config['lunch_time']}")
     print(f"  Dormir:   {config['sleep_time']}")
     print(f"  Animal:   {animal}")
     print(f"  Música:   {'sí' if music else 'no'}")
+    parts = stats_summary(stats)
+    if parts:
+        print("── Estadísticas ────")
+        for p in parts:
+            print(f"  {p}")
     print("────────────────────")
 
     while True:
@@ -86,6 +117,9 @@ def main():
             if lunch <= now <= lunch + timedelta(minutes=30):
                 print(f"[{now.strftime('%H:%M')}] ⏰ Almuerzo")
                 launch_break('almuerzo', 0, animal)
+                stats = load_stats()
+                for p in stats_summary(stats):
+                    print(f"  {p}")
                 last_lunch_date = hoy
 
         if last_sleep_date != hoy:
@@ -93,12 +127,18 @@ def main():
             if sleep_t <= now <= sleep_t + timedelta(minutes=30):
                 print(f"[{now.strftime('%H:%M')}] 🌙 Dormir")
                 launch_break('dormir', 0, animal)
+                stats = load_stats()
+                for p in stats_summary(stats):
+                    print(f"  {p}")
                 last_sleep_date = hoy
 
         if time.time() >= next_active:
             print(f"[{now.strftime('%H:%M')}] 🏃 Pausa activa")
             play_music(music, config['active_duration_sec'])
             launch_break('activo', config['active_duration_sec'], animal)
+            stats = load_stats()
+            for p in stats_summary(stats):
+                print(f"  {p}")
             next_active = time.time() + ai
             next_visual = time.time() + ai
 
@@ -106,6 +146,9 @@ def main():
             print(f"[{now.strftime('%H:%M')}] 👀 Descanso visual")
             play_music(music, config['visual_duration_sec'])
             launch_break('visual', config['visual_duration_sec'], animal)
+            stats = load_stats()
+            for p in stats_summary(stats):
+                print(f"  {p}")
             next_visual = time.time() + vi
 
         time.sleep(5)

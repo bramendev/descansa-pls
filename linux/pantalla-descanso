@@ -7,10 +7,16 @@ import random
 import time
 import sys
 import signal
+import json
+from pathlib import Path
+from datetime import date
 
 SEGUNDOS = int(sys.argv[1]) if len(sys.argv) > 1 else 30
 MODO = (sys.argv[2] if len(sys.argv) > 2 else 'visual').lower()
 ANIMAL = (sys.argv[3] if len(sys.argv) > 3 else 'perro').lower()
+
+CONFIG_DIR = Path.home() / '.config' / 'descanso-visual'
+STATS_FILE = CONFIG_DIR / 'stats.json'
 
 def _center(frames):
     w = max(len(l) for f in frames for l in f)
@@ -110,6 +116,58 @@ DORMIR_TIPS = [
 BOWL = [" .-._.-. ", "(  o o  )", " \\ o o / ", "  `---'  "]
 MOON = ["   .-.   ", "  (   )  ", "   `-'   ", "  *   *  ", "   * *   "]
 
+def load_stats():
+    try:
+        if STATS_FILE.exists():
+            with open(STATS_FILE) as f:
+                return json.load(f)
+    except Exception:
+        pass
+    return {'visual': {'total': 0, 'today': 0, 'date': ''},
+            'activo': {'total': 0, 'today': 0, 'date': ''},
+            'almuerzo': {'total': 0, 'today': 0, 'date': ''},
+            'dormir': {'total': 0, 'today': 0, 'date': ''}}
+
+def save_stats(stats):
+    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    with open(STATS_FILE, 'w') as f:
+        json.dump(stats, f, indent=2)
+
+def increment_stat(modo):
+    stats = load_stats()
+    today = date.today().isoformat()
+    if modo not in stats:
+        stats[modo] = {'total': 0, 'today': 0, 'date': today}
+    if stats[modo].get('date') != today:
+        stats[modo]['today'] = 0
+    stats[modo]['total'] += 1
+    stats[modo]['today'] += 1
+    stats[modo]['date'] = today
+    save_stats(stats)
+    return stats
+
+def get_stats_line(stats):
+    today = date.today().isoformat()
+    parts = []
+    labels = {
+        'visual': ('visuales', '👁'),
+        'activo': ('activas', '🏃'),
+        'almuerzo': ('almuerzos', '🍽'),
+        'dormir': ('dormir', '🌙')
+    }
+    for modo, (label, icon) in labels.items():
+        if modo in stats:
+            s = stats[modo]
+            if s.get('date') == today:
+                t = s['today']
+            else:
+                t = 0
+            if t > 0:
+                parts.append(f"{icon} {t} {label}")
+    if not parts:
+        return "Hoy aún no hay pausas registradas"
+    return "  ·  ".join(parts)
+
 THEMES = {
     'visual': {
         'bg': '#0a0a1a', 'clock': '#e0e0ff', 'date': '#9090b0',
@@ -162,6 +220,8 @@ class PantallaDescanso(Gtk.Window):
         self.tiempo_restante = SEGUNDOS if TIENE_TEMPORIZADOR else 0
         self.inicio = time.monotonic()
         self.frame_idx = 0
+        self.stats = load_stats()
+        self.stats_updated = False
 
         screen = self.get_screen()
         visual = screen.get_rgba_visual()
@@ -170,21 +230,23 @@ class PantallaDescanso(Gtk.Window):
 
         css = f"""
         window {{ background: {T['bg']}; }}
-        #clock {{ font-size: 72px; font-weight: bold; color: {T['clock']}; }}
-        #date  {{ font-size: 18px; color: {T['date']}; margin-top: -8px; }}
-        #animal-label {{ font-size: 20px; font-family: monospace; color: {T['animal']}; margin-top: 12px; }}
-        #timer-text {{ font-size: 24px; color: {T['timer']}; margin-top: 20px; }}
-        #info-text {{ font-size: 18px; color: {T['info']}; font-style: italic; margin-top: 25px;
+        #clock {{ font-size: 80px; font-weight: bold; color: {T['clock']}; }}
+        #date  {{ font-size: 16px; color: {T['date']}; margin-top: 4px; }}
+        #animal-label {{ font-size: 18px; font-family: monospace; color: {T['animal']}; margin-top: 20px; }}
+        #timer-text {{ font-size: 22px; color: {T['timer']}; margin-top: 16px; }}
+        #info-text {{ font-size: 16px; color: {T['info']}; font-style: italic; margin-top: 20px;
                       padding-left: 40px; padding-right: 40px; }}
-        #mode-title {{ font-size: 38px; font-weight: bold; color: {T['title']}; margin-top: 15px; }}
-        #mode-text {{ font-size: 22px; color: {T['text']}; margin-top: 10px;
+        #stats-text {{ font-size: 14px; color: {T['date']}; margin-top: 16px;
+                       padding-left: 40px; padding-right: 40px; }}
+        #mode-title {{ font-size: 36px; font-weight: bold; color: {T['title']}; margin-top: 20px; }}
+        #mode-text {{ font-size: 20px; color: {T['text']}; margin-top: 12px;
                       padding-left: 40px; padding-right: 40px; }}
-        #mode-icon {{ font-size: 20px; font-family: monospace; color: {T['icon']}; margin-top: 15px; }}
-        #progress trough {{ min-height: 8px; border-radius: 4px; background: {T['ptrack']}; }}
-        #progress progress {{ min-height: 8px; border-radius: 4px; background: {T['pfill']}; }}
-        #close-btn {{ font-size: 18px; padding: 10px 36px; background: {T['btn']};
+        #mode-icon {{ font-size: 18px; font-family: monospace; color: {T['icon']}; margin-top: 20px; }}
+        #progress trough {{ min-height: 10px; border-radius: 5px; background: {T['ptrack']}; }}
+        #progress progress {{ min-height: 10px; border-radius: 5px; background: {T['pfill']}; }}
+        #close-btn {{ font-size: 16px; padding: 12px 40px; background: {T['btn']};
                        color: white; border: 2px solid {T['bord']}; border-radius: 8px;
-                       margin-top: 25px; }}
+                       margin-top: 20px; font-weight: bold; }}
         #close-btn:hover {{ background: {T['bhov']}; }}
         """
         provider = Gtk.CssProvider()
@@ -201,7 +263,7 @@ class PantallaDescanso(Gtk.Window):
         vbox.pack_start(self.label_clock, False, False, 0)
 
         self.label_date = Gtk.Label(name="date")
-        vbox.pack_start(self.label_date, False, False, 6)
+        vbox.pack_start(self.label_date, False, False, 0)
 
         if MODO in ('visual', 'activo'):
             self.label_animal = Gtk.Label(name="animal-label")
@@ -212,12 +274,12 @@ class PantallaDescanso(Gtk.Window):
             vbox.pack_start(self.label_timer, False, False, 0)
 
             self.progress = Gtk.ProgressBar(name="progress")
-            self.progress.set_size_request(350, -1)
-            self.progress.set_margin_top(12)
+            self.progress.set_size_request(380, -1)
+            self.progress.set_margin_top(10)
             self.progress.set_margin_bottom(8)
             vbox.pack_start(self.progress, False, False, 0)
 
-            items = CURIOSIDADES if MODO == 'visual' else CONSEJOS_SALUD
+            items = CURIOSIDADES if MODO == 'visual' else EJERCICIOS
             label_info = Gtk.Label(name="info-text", label=random.choice(items))
             label_info.set_line_wrap(True)
             label_info.set_max_width_chars(50)
@@ -239,13 +301,18 @@ class PantallaDescanso(Gtk.Window):
 
             label_foot = Gtk.Label(name="info-text",
                 label="Tómate tu tiempo, la pantalla seguirá aquí.")
-            label_foot.set_margin_top(20)
+            label_foot.set_margin_top(16)
             vbox.pack_start(label_foot, False, False, 0)
+
+        stats_line = get_stats_line(self.stats)
+        self.label_stats = Gtk.Label(name="stats-text", label=stats_line)
+        self.label_stats.set_margin_top(16)
+        vbox.pack_start(self.label_stats, False, False, 0)
 
         btn_label = "Cerrar" if not TIENE_TEMPORIZADOR else "Desbloquear"
         self.btn_close = Gtk.Button(label=btn_label, name="close-btn")
         self.btn_close.set_visible(not TIENE_TEMPORIZADOR)
-        self.btn_close.connect("clicked", lambda _: Gtk.main_quit())
+        self.btn_close.connect("clicked", self.on_close)
         vbox.pack_start(self.btn_close, False, False, 0)
 
         self.actualizar_reloj()
@@ -289,13 +356,22 @@ class PantallaDescanso(Gtk.Window):
             return False
         return True
 
+    def on_close(self, _btn):
+        if not self.stats_updated:
+            self.stats = increment_stat(MODO)
+            self.stats_updated = True
+        Gtk.main_quit()
+
     def on_key(self, _widget, event):
         if event.keyval == Gdk.KEY_Escape:
             if not TIENE_TEMPORIZADOR or self.tiempo_restante <= 0:
+                if not self.stats_updated and (not TIENE_TEMPORIZADOR or self.tiempo_restante <= 0):
+                    self.stats = increment_stat(MODO)
+                    self.stats_updated = True
                 Gtk.main_quit()
         if event.keyval in (Gdk.KEY_Return, Gdk.KEY_KP_Enter):
             if self.btn_close.get_visible():
-                Gtk.main_quit()
+                self.on_close(None)
         return True
 
 
