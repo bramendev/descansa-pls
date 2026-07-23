@@ -324,6 +324,7 @@ class PantallaDescanso:
             bordercolor=T['bg'], lightcolor=T['pfill'], darkcolor=T['pfill'])
 
         self._build_ui()
+        self._build_close_x()
         self._bind_keys()
 
         self.root.after(100, self._tick)
@@ -418,6 +419,16 @@ class PantallaDescanso:
         tk.Label(f, bg=T['bg'], fg=T['date'],
             font=(SANS, 11), text=hint).pack(pady=(8, 0))
 
+    def _build_close_x(self):
+        self.btn_x = tk.Button(self.root, text="✕",
+            font=(SANS, 16, 'bold'), bg=T['bg'], fg=T['date'],
+            activebackground=T['bord'], activeforeground='white',
+            bd=0, relief='flat', cursor='hand2', padx=12, pady=4,
+            command=self.do_skip)
+        self.btn_x.place(x=self._w - 50, y=10)
+        if TIENE_TIMER:
+            self.btn_x.config(state='disabled', fg=T['ptrack'])
+
     def _bind_keys(self):
         self.root.bind('<Key-space>', lambda e: self.do_skip())
         self.root.bind('<Key-z>', lambda e: self.do_snooze())
@@ -449,6 +460,7 @@ class PantallaDescanso:
             self.progress['value'] = 100
             self.label_timer.config(text="¡Ya puedes continuar!")
             self.btn.pack(pady=(16, 0))
+            self.btn_x.config(state='normal', fg=T['date'])
             return
 
         self.root.after(100, self._timer_tick)
