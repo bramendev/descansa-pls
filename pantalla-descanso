@@ -296,16 +296,14 @@ class PantallaDescanso:
         self.root = tk.Tk()
         self.root.title(T['title_txt'])
         self.root.configure(bg=T['bg'])
-        self.root.focus_force()
 
         self._w = self.root.winfo_screenwidth()
         self._h = self.root.winfo_screenheight()
-        self.root.overrideredirect(True)
-        self.root.geometry(f"{self._w}x{self._h}+0+0")
         try:
             self.root.attributes('-fullscreen', True)
         except Exception:
-            pass
+            self.root.overrideredirect(True)
+            self.root.geometry(f"{self._w}x{self._h}+0+0")
         try:
             self.root.attributes('-topmost', True)
         except Exception:
@@ -328,6 +326,7 @@ class PantallaDescanso:
         self._bind_keys()
 
         self.root.after(100, self._tick)
+        self.root.after(200, self._grab_focus)
         if TIENE_TIMER:
             self.root.after(400, self._animar)
             self.root.after(100, self._timer_tick)
@@ -428,6 +427,10 @@ class PantallaDescanso:
         self.btn_x.place(x=self._w - 50, y=10)
         if TIENE_TIMER:
             self.btn_x.config(state='disabled', fg=T['ptrack'])
+
+    def _grab_focus(self):
+        self.root.lift()
+        self.root.focus_force()
 
     def _bind_keys(self):
         self.root.bind('<Key-space>', lambda e: self.do_skip())
