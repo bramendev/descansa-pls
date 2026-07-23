@@ -14,7 +14,9 @@ param(
 )
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$pantalla = Join-Path $scriptDir "pantalla-descanso.ps1"
+$pantallaExe = Join-Path $scriptDir "pantalla-descanso.exe"
+$pantallaPs1 = Join-Path $scriptDir "pantalla-descanso.ps1"
+$pantalla = if (Test-Path $pantallaExe) { $pantallaExe } else { $pantallaPs1 }
 $vi = $visualIntervalMin * 60
 $ai = $activeIntervalMin * 60
 $wi = $waterIntervalMin * 60

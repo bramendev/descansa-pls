@@ -35,6 +35,14 @@ Requiere: `python3` + `gtk3` (PyGObject) + `ffplay` (para música y sonido).
 
 ## Windows
 
+### Opcion A: .exe (recomendado)
+
+1. Ejecutar `windows\build.bat` (instala ps2exe y compila los .exe)
+2. **Auto-inicio:** `Win+R` → `shell:startup` → acceso directo a `windows\descanso.exe`
+3. O ejecutar `windows\descanso.exe` manualmente
+
+### Opcion B: PowerShell scripts
+
 1. Copiar `windows/` a `C:\Users\tuUsuario\scripts\`
 2. **Auto-inicio:** `Win+R` → `shell:startup` → acceso directo a `descanso.bat`
 3. O manual: ejecutar `descanso.bat`
