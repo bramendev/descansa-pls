@@ -17,17 +17,25 @@ def _center(frames):
     return [[l.center(w) for l in f] for f in frames]
 
 _DOG = _center([
-    [".---.", "( ·· )", "( ···· )", " '-' "],
-    [".---.", "( ·· )", "( ···· )", " '-' w"],
-    [".---.", "( ·· )", "( ···· )", " '-' "],
-    [".---.", "( ·· )", "( ···· )", "w '-' "],
+    ["  ▄▄█▄▄",  " █·····█", " █·█·█·█", " ███████",
+     "  █···█",  "  █···█",  "  █████",  "  █···█"],
+    ["  ▄▄█▄▄",  " █·····█", " █·█·█·█", " ███████",
+     "  █···█",  "  █···█",  "  █████",  "  █··▀█"],
+    ["  ▄▄█▄▄",  " █·····█", " █·█·█·█", " ███████",
+     "  █···█",  "  █···█",  "  █████",  "  █···█"],
+    ["  ▁▁█▁▁",  " █·····█", " █·█·█·█", " ███████",
+     "  █···█",  "  █···█",  "  █████",  "  █···█"],
 ])
 
 _CAT = _center([
-    [' /\\_/\\ ', '( ·· )', '( ···· )', ' /"\\ '],
-    [' /\\_/\\ ', '( ~~ )', '( ···· )', ' /"\\ '],
-    [' /\\_/\\ ', '( ·· )', '( ···· )', ' /"\\ '],
-    [' /\\_/\\ ', '( @@ )', '( ···· )', ' /"\\ '],
+    ["  ▄▄█ █▄▄", " █·······█", " █·█···█·█", " █████████",
+     "  █·····█", "  █·····█", "   █████",  "   █···█"],
+    ["  ▄▄█ █▄▄", " █·······█", " █·█···█·█", " █████████",
+     "  █·····█", "  █·····█", "   █████",  "  █····█"],
+    ["  ▄▄█ █▄▄", " █·······█", " █·█···█·█", " █████████",
+     "  █·····█", "  █·····█", "   █████",  "   █···█"],
+    ["  ▄▄█ █▄▄", " █·······█", " █·█-█·█·█", " █████████",
+     "  █·····█", "  █·····█", "   █████",  "   █···█"],
 ])
 
 FRAMES = _DOG if ANIMAL not in ('gato', 'cat', 'g') else _CAT
@@ -62,7 +70,7 @@ CURIOSIDADES = [
 EJERCICIOS = [
     "Estira los brazos hacia arriba — 15 segundos",
     "Gira los hombros hacia atrás — 10 repeticiones",
-    "Inclina la cabeza a la izquierda — 15 seg cada lado",
+    "Inclina la cabeza a la izquierda — 15s cada lado",
     "Abre y cierra las manos — 10 veces",
     "Gira el cuello lentamente — 5 veces cada lado",
     "Estira la espalda hacia atrás — 10 segundos",
@@ -107,20 +115,8 @@ DORMIR_TIPS = [
     "Desconecta las notificaciones del teléfono.",
 ]
 
-BOWL = [
-    " .-._.-. ",
-    "(  o o  )",
-    " \\ o o / ",
-    "  `---'  ",
-]
-
-MOON = [
-    "   .-.   ",
-    "  (   )  ",
-    "   `-'   ",
-    "  *   *  ",
-    "   * *   ",
-]
+BOWL = [" .-._.-. ", "(  o o  )", " \\ o o / ", "  `---'  "]
+MOON = ["   .-.   ", "  (   )  ", "   `-'   ", "  *   *  ", "   * *   "]
 
 THEMES = {
     'visual': {
@@ -184,9 +180,9 @@ class PantallaDescanso(Gtk.Window):
         window {{ background: {T['bg']}; }}
         #clock {{ font-size: 72px; font-weight: bold; color: {T['clock']}; }}
         #date  {{ font-size: 18px; color: {T['date']}; margin-top: -8px; }}
-        #animal-label {{ font-size: 22px; font-family: monospace; color: {T['animal']}; margin-top: 15px; }}
+        #animal-label {{ font-size: 20px; font-family: monospace; color: {T['animal']}; margin-top: 12px; }}
         #timer-text {{ font-size: 24px; color: {T['timer']}; margin-top: 20px; }}
-        #info-text {{ font-size: 18px; color: {T['info']}; font-style: italic; margin-top: 30px;
+        #info-text {{ font-size: 18px; color: {T['info']}; font-style: italic; margin-top: 25px;
                       padding-left: 40px; padding-right: 40px; }}
         #mode-title {{ font-size: 38px; font-weight: bold; color: {T['title']}; margin-top: 15px; }}
         #mode-text {{ font-size: 22px; color: {T['text']}; margin-top: 10px;
@@ -196,7 +192,7 @@ class PantallaDescanso(Gtk.Window):
         #progress progress {{ min-height: 8px; border-radius: 4px; background: {T['pfill']}; }}
         #close-btn {{ font-size: 18px; padding: 10px 36px; background: {T['btn']};
                        color: white; border: 2px solid {T['bord']}; border-radius: 8px;
-                       margin-top: 30px; }}
+                       margin-top: 25px; }}
         #close-btn:hover {{ background: {T['bhov']}; }}
         """
         provider = Gtk.CssProvider()
@@ -217,6 +213,7 @@ class PantallaDescanso(Gtk.Window):
 
         if MODO in ('visual', 'activo'):
             self.label_animal = Gtk.Label(name="animal-label")
+            self.label_animal.set_use_markup(False)
             vbox.pack_start(self.label_animal, False, False, 0)
 
             self.label_timer = Gtk.Label(name="timer-text")
@@ -228,16 +225,15 @@ class PantallaDescanso(Gtk.Window):
             self.progress.set_margin_bottom(8)
             vbox.pack_start(self.progress, False, False, 0)
 
-            if MODO == 'visual':
-                label_info = Gtk.Label(name="info-text", label=random.choice(CURIOSIDADES))
-            else:
-                label_info = Gtk.Label(name="info-text", label=random.choice(CONSEJOS_SALUD))
+            items = CURIOSIDADES if MODO == 'visual' else CONSEJOS_SALUD
+            label_info = Gtk.Label(name="info-text", label=random.choice(items))
             label_info.set_line_wrap(True)
             label_info.set_max_width_chars(50)
             vbox.pack_start(label_info, False, False, 0)
         else:
-            icon = '\n'.join(_center([BOWL])[0]) if MODO == 'almuerzo' else '\n'.join(_center([MOON])[0])
-            label_icon = Gtk.Label(name="mode-icon", label=icon)
+            icon = (BOWL if MODO == 'almuerzo' else MOON)
+            icon_text = '\n'.join(l.center(max(len(r) for r in icon)) for l in icon)
+            label_icon = Gtk.Label(name="mode-icon", label=icon_text)
             vbox.pack_start(label_icon, False, False, 0)
 
             label_title = Gtk.Label(name="mode-title", label=T['title_txt'])
