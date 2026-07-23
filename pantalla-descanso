@@ -295,11 +295,21 @@ class PantallaDescanso:
     def __init__(self):
         self.root = tk.Tk()
         self.root.title(T['title_txt'])
-        self.root.overrideredirect(True)
-        self.root.attributes('-fullscreen', True)
-        self.root.attributes('-topmost', True)
         self.root.configure(bg=T['bg'])
         self.root.focus_force()
+
+        self._w = self.root.winfo_screenwidth()
+        self._h = self.root.winfo_screenheight()
+        self.root.overrideredirect(True)
+        self.root.geometry(f"{self._w}x{self._h}+0+0")
+        try:
+            self.root.attributes('-fullscreen', True)
+        except Exception:
+            pass
+        try:
+            self.root.attributes('-topmost', True)
+        except Exception:
+            pass
 
         self.tiempo_restante = SEGUNDOS if TIENE_TIMER else 0
         self.inicio = time.monotonic()
