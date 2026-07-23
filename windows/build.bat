@@ -20,7 +20,7 @@ if %errorlevel% neq 0 (
 )
 
 echo [1/2] Compilando descanso.exe...
-powershell.exe -Command "ps2exe '%~dp0descanso.ps1' '%~dp0descanso.exe' -noConsole"
+powershell.exe -Command "ps2exe '%~dp0..\descanso' '%~dp0descanso.exe' -noConsole"
 if %errorlevel% neq 0 (
     echo [ERROR] Fallo al compilar descanso.exe
     pause
@@ -28,7 +28,7 @@ if %errorlevel% neq 0 (
 )
 
 echo [2/2] Compilando pantalla-descanso.exe...
-powershell.exe -Command "ps2exe '%~dp0pantalla-descanso.ps1' '%~dp0pantalla-descanso.exe'"
+powershell.exe -Command "ps2exe '%~dp0..\pantalla-descanso' '%~dp0pantalla-descanso.exe'"
 if %errorlevel% neq 0 (
     echo [ERROR] Fallo al compilar pantalla-descanso.exe
     pause

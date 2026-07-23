@@ -1,0 +1,463 @@
+#!/usr/bin/env python3
+import tkinter as tk
+from tkinter import ttk, font
+import random
+import time
+import json
+import sys
+from pathlib import Path
+from datetime import date, datetime, timedelta
+
+SEGUNDOS = int(sys.argv[1]) if len(sys.argv) > 1 else 30
+MODO = (sys.argv[2] if len(sys.argv) > 2 else 'visual').lower()
+ANIMAL = (sys.argv[3] if len(sys.argv) > 3 else 'perro').lower()
+WEATHER = sys.argv[4] if len(sys.argv) > 4 else None
+
+CONFIG_DIR = Path.home() / '.config' / 'descanso-visual'
+STATS_FILE = CONFIG_DIR / 'stats.json'
+CONFIG_FILE = CONFIG_DIR / 'config.json'
+MESSAGES_FILE = CONFIG_DIR / 'messages.json'
+SNOOZE_FILE = CONFIG_DIR / 'snooze_until'
+
+TIENE_TIMER = MODO in ('visual', 'activo')
+MONO = "Consolas" if sys.platform == "win32" else "monospace"
+SANS = "Segoe UI" if sys.platform == "win32" else "sans-serif"
+
+def _center(frames):
+    w = max(len(l) for f in frames for l in f)
+    return [[l.center(w) for l in f] for f in frames]
+
+def load_config():
+    try:
+        if CONFIG_FILE.exists():
+            with open(CONFIG_FILE) as f:
+                return json.load(f)
+    except Exception:
+        pass
+    return {}
+
+def load_stats():
+    try:
+        if STATS_FILE.exists():
+            with open(STATS_FILE) as f:
+                return json.load(f)
+    except Exception:
+        pass
+    return {}
+
+def save_stats(stats):
+    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    with open(STATS_FILE, 'w') as f:
+        json.dump(stats, f, indent=2)
+
+def increment_stat(modo):
+    stats = load_stats()
+    today = date.today().isoformat()
+    for key in ('visual', 'activo', 'almuerzo', 'dormir', 'agua'):
+        if key not in stats:
+            stats[key] = {'total': 0, 'today': 0, 'date': today}
+    if stats[modo].get('date') != today:
+        stats[modo]['today'] = 0
+    stats[modo]['total'] += 1
+    stats[modo]['today'] += 1
+    stats[modo]['date'] = today
+    if 'history' not in stats:
+        stats['history'] = {}
+    if today not in stats['history']:
+        stats['history'][today] = {}
+    stats['history'][today][modo] = stats['history'][today].get(modo, 0) + 1
+    cutoff = (date.today() - timedelta(days=30)).isoformat()
+    stats['history'] = {k: v for k, v in stats['history'].items() if k >= cutoff}
+    save_stats(stats)
+    return stats
+
+def get_stats_line(stats):
+    today = date.today().isoformat()
+    parts = []
+    for modo, (label, icon) in {
+        'visual': ('visuales', '👁'), 'activo': ('activas', '🏃'),
+        'almuerzo': ('almuerzos', '🍽'), 'dormir': ('dormir', '🌙'),
+        'agua': ('aguas', '💧')
+    }.items():
+        if modo in stats:
+            s = stats[modo]
+            t = s['today'] if s.get('date') == today else 0
+            if t > 0:
+                parts.append(f"{icon} {t} {label}")
+    if not parts:
+        return "Hoy aún no hay pausas registradas"
+    return "  ·  ".join(parts)
+
+def get_weekly_line(stats):
+    today = date.today()
+    week_start = today - timedelta(days=today.weekday())
+    totals = {}
+    for i in range(7):
+        day = (week_start + timedelta(days=i)).isoformat()
+        if day in stats.get('history', {}):
+            for modo, count in stats['history'][day].items():
+                totals[modo] = totals.get(modo, 0) + count
+    if not totals:
+        return ""
+    parts = []
+    labels = {'visual': ('visuales', '👁'), 'activo': ('activas', '🏃'),
+              'agua': ('aguas', '💧'), 'almuerzo': ('almuerzos', '🍽'),
+              'dormir': ('dormir', '🌙')}
+    for modo, count in sorted(totals.items(), key=lambda x: -x[1]):
+        if modo in labels and count > 0:
+            parts.append(f"{labels[modo][1]} {count} {labels[modo][0]}")
+    if not parts:
+        return ""
+    return "Semana: " + "  ·  ".join(parts)
+
+def write_snooze():
+    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    with open(SNOOZE_FILE, 'w') as f:
+        f.write(str(time.time() + 300))
+
+def load_custom_messages():
+    try:
+        if MESSAGES_FILE.exists():
+            with open(MESSAGES_FILE) as f:
+                return json.load(f)
+    except Exception:
+        pass
+    return {}
+
+custom = load_custom_messages()
+
+_DOG = _center([
+    ["     / \\__", "    (    @\\___", "    /          O", "   /    (_____/", "  /_____/    U"],
+    ["     / \\__", "    (    @\\___", "    /          O", "   /    (_____/", "  /_____/   ~U"],
+    ["     / \\__", "    (    @\\___", "    /          O", "   /    (_____/", "  /_____/    U"],
+    ["     / \\__", "    (    @\\___", "    /          O", "   /    (_____/", " ~\\_____/    U"],
+])
+
+_CAT = _center([
+    ["   |\\      _,,,---,,_", "   /,`.-'`'    -.  ;-;;,_", "  |,4-  ) )-,_..;\\ (  `'-'", " '---''(_/--'  `-'\\_)"],
+    ["   |\\      _,,,---,,_", "   /,`.-'`'    -.  ;-;;,_", "  |,-  ) )-,_..;\\ (  `'-'", " '---''(_/--'  `-'\\_)"],
+    ["   |\\      _,,,---,,_", "   /,`.-'`'    -.  ;-;;,_", "  |,4-  ) )-,_..;\\ (  `'-'", " '---''(_/--'  `-'\\_)"],
+    ["   |\\      _,,,---,,_", "   /,`.-'`'    -.  ;-;;,_", "  |,w-  ) )-,_..;\\ (  `'-'", " '---''(_/--'  `-'\\_)"],
+])
+
+FRAMES = _DOG if ANIMAL not in ('gato', 'cat', 'g') else _CAT
+
+_CURIOSIDADES = [
+    "Los pulpos tienen tres corazones y su sangre es azul.",
+    "Un día en Venus dura más que un año en Venus.",
+    "Las hormigas nunca duermen; toman micro-siestas de 8 segundos.",
+    "El corazón humano late unas 100.000 veces al día.",
+    "El agua caliente se congela más rápido que el agua fría.",
+    "Los flamencos no nacen rosados, se vuelven rosados por su alimentación.",
+    "La miel nunca se echa a perder.",
+    "Las nubes típicas pesan unas 500 toneladas.",
+    "Los koalas tienen huellas dactilares casi idénticas a las humanas.",
+    "La Tierra viaja a 107.000 km/h alrededor del Sol.",
+    "Apagar la vista 20 segundos cada 20 minutos reduce la fatiga visual un 40%.",
+    "Hay más estrellas en el universo que granos de arena en todas las playas.",
+    "Los gatos no pueden saborear lo dulce.",
+    "Los pingüinos proponen matrimonio con una piedra.",
+    "Tu cuerpo reemplaza millones de células cada segundo.",
+] + custom.get('curiosidades', [])
+
+_EJERCICIOS = [
+    "Estira los brazos hacia arriba — 15 segundos",
+    "Gira los hombros hacia atrás — 10 repeticiones",
+    "Inclina la cabeza a la izquierda — 15s cada lado",
+    "Abre y cierra las manos — 10 veces",
+    "Estira la espalda hacia atrás — 10 segundos",
+    "Camina un poco — 2 minutos",
+    "Círculos con los tobillos — 10 veces cada pie",
+    "Estira las piernas — 15 segundos cada una",
+    "Sube y baja los hombros — 10 veces",
+    "Gira la cintura — 5 veces cada lado",
+    "Abre el pecho con brazos atrás — 15 segundos",
+    "Respira profundo: 4s inspira, 4s mantén, 4s exhala",
+] + custom.get('ejercicios', [])
+
+_MOTIVACIONALES = [
+    "Cada paso cuenta, no importa cuán pequeño.",
+    "El progreso, no la perfección.",
+    "Tu esfuerzo de hoy es tu fuerza de mañana.",
+    "No te rindas, estás más cerca de lo que crees.",
+    "La disciplina es el puente entre metas y logros.",
+    "Un descanso ahora es energía para después.",
+    "Cuida tu cuerpo, es el único lugar que tienes para vivir.",
+    "La constancia vence al talento.",
+    "Tu salud es tu mayor inversión.",
+    "Respira profundo. Esto también pasará.",
+    "Pequeños hábitos, grandes cambios.",
+    "El mejor momento para empezar es ahora.",
+] + custom.get('motivacionales', [])
+
+_COMIDAS = [
+    "Come algo nutritivo y equilibrado.",
+    "Tómate mínimo 20 minutos para comer sin prisas.",
+    "Aléjate de la pantalla mientras comes.",
+    "Hidrátate bien con agua.",
+    "Incluye proteínas y verduras en tu plato.",
+] + custom.get('comidas', [])
+
+_DORMIR_TIPS = [
+    "Apaga todas las pantallas 30 min antes de dormir.",
+    "Prepara tu habitación: oscura, fresca y silenciosa.",
+    "Lee un libro antes de dormir.",
+    "Evita cafeína después de las 6 PM.",
+    "Respira profundamente 5 veces: 4-7-8.",
+    "Desconecta las notificaciones del teléfono.",
+] + custom.get('dormir', [])
+
+_AGUA_MSGS = [
+    "¡Toma un vaso de agua!",
+    "Hidrátate, tu cuerpo lo necesita.",
+    "Un vaso de agua ahora te dará energía.",
+    "Beber agua mejora tu concentración.",
+    "Tu cerebro es 75% agua. ¡Hidrátalo!",
+] + custom.get('agua', [])
+
+BOWL = [" .-._.-. ", "(  o o  )", " \\ o o / ", "  `---'  "]
+MOON = ["   .-.   ", "  (   )  ", "   `-'   ", "  *   *  ", "   * *   "]
+WATER = ["    .", "   / \\", "  /   \\", " |     |", "  \\   /", "   \\ /", "    `"]
+
+def make_theme(modo, theme_name):
+    is_dark = theme_name == 'dark'
+    bg = '#0a0a1a' if is_dark else '#f0f0f5'
+    clock = '#e0e0ff' if is_dark else '#1a1a3a'
+    date_c = '#9090b0' if is_dark else '#6060a0'
+    info = '#b0b0d0' if is_dark else '#505080'
+    ptrack = '#1a1a3a' if is_dark else '#d0d0e0'
+
+    accents = {
+        'visual': {
+            'animal': '#c0c0e0' if is_dark else '#4040a0',
+            'timer': '#ffcc66' if is_dark else '#cc6600',
+            'title': '#ff7755' if is_dark else '#cc4422',
+            'text': '#d0d0a0' if is_dark else '#303060',
+            'pfill': '#6688ff' if is_dark else '#4466cc',
+            'btn': '#3344aa', 'bord': '#5566cc',
+        },
+        'activo': {
+            'animal': '#a0e0a0' if is_dark else '#208020',
+            'timer': '#88ff88' if is_dark else '#228822',
+            'title': '#66ff66' if is_dark else '#226622',
+            'text': '#c0e0c0' if is_dark else '#204020',
+            'pfill': '#44aa44' if is_dark else '#228822',
+            'btn': '#2a5a2a', 'bord': '#44aa44',
+        },
+        'almuerzo': {
+            'animal': '#d0b060' if is_dark else '#806020',
+            'timer': '#ffaa44' if is_dark else '#cc6600',
+            'title': '#ff9944' if is_dark else '#cc6600',
+            'text': '#e0c080' if is_dark else '#604020',
+            'pfill': '#cc8844' if is_dark else '#aa6622',
+            'btn': '#8a5a2a', 'bord': '#cc8844',
+        },
+        'dormir': {
+            'animal': '#8080d0' if is_dark else '#4040a0',
+            'timer': '#8888ff' if is_dark else '#4444cc',
+            'title': '#6666ff' if is_dark else '#4444cc',
+            'text': '#8080d0' if is_dark else '#4040a0',
+            'pfill': '#4444cc' if is_dark else '#3333aa',
+            'btn': '#2222aa', 'bord': '#4444cc',
+        },
+        'agua': {
+            'animal': '#80c0ff' if is_dark else '#2060a0',
+            'timer': '#66ccff' if is_dark else '#2266aa',
+            'title': '#44aaff' if is_dark else '#2266aa',
+            'text': '#a0d0ff' if is_dark else '#204080',
+            'pfill': '#4488ff' if is_dark else '#2266cc',
+            'btn': '#2244aa', 'bord': '#4466cc',
+        },
+    }
+
+    titles = {
+        'visual': 'DESCANSO VISUAL', 'activo': 'PAUSA ACTIVA',
+        'almuerzo': 'HORA DE ALMORZAR', 'dormir': 'HORA DE DORMIR',
+        'agua': 'HIDRATACIÓN',
+    }
+
+    t = {'bg': bg, 'clock': clock, 'date': date_c, 'info': info, 'ptrack': ptrack}
+    t.update(accents.get(modo, accents['visual']))
+    t['title_txt'] = titles.get(modo, 'DESCANSO')
+    return t
+
+config = load_config()
+theme_pref = config.get('theme', 'dark')
+if theme_pref == 'auto':
+    hour = datetime.now().hour
+    theme_name = 'light' if 7 <= hour < 19 else 'dark'
+else:
+    theme_name = theme_pref
+T = make_theme(MODO, theme_name)
+
+
+class PantallaDescanso:
+    def __init__(self):
+        self.root = tk.Tk()
+        self.root.title(T['title_txt'])
+        self.root.overrideredirect(True)
+        self.root.attributes('-fullscreen', True)
+        self.root.attributes('-topmost', True)
+        self.root.configure(bg=T['bg'])
+        self.root.focus_force()
+
+        self.tiempo_restante = SEGUNDOS if TIENE_TIMER else 0
+        self.inicio = time.monotonic()
+        self.frame_idx = 0
+        self.stats = load_stats()
+        self.stats_updated = False
+
+        self.style = ttk.Style()
+        self.style.theme_use('clam')
+        self.style.configure("custom.Horizontal.TProgressbar",
+            troughcolor=T['ptrack'], background=T['pfill'],
+            bordercolor=T['bg'], lightcolor=T['pfill'], darkcolor=T['pfill'])
+
+        self._build_ui()
+        self._bind_keys()
+
+        self.root.after(100, self._tick)
+        if TIENE_TIMER:
+            self.root.after(400, self._animar)
+            self.root.after(100, self._timer_tick)
+
+    def _build_ui(self):
+        self.root.grid_columnconfigure(0, weight=1)
+        self.root.grid_rowconfigure(0, weight=1)
+
+        f = tk.Frame(self.root, bg=T['bg'])
+        f.grid(row=0, column=0)
+
+        self.label_clock = tk.Label(f, bg=T['bg'], fg=T['clock'],
+            font=(SANS, 80, 'bold'))
+        self.label_clock.pack(pady=(40, 0))
+
+        self.label_date = tk.Label(f, bg=T['bg'], fg=T['date'],
+            font=(SANS, 16))
+        self.label_date.pack()
+
+        y = 0
+        if WEATHER:
+            tk.Label(f, bg=T['bg'], fg=T['date'], font=(SANS, 14),
+                text=WEATHER).pack()
+            y = 1
+
+        if TIENE_TIMER:
+            self.label_animal = tk.Label(f, bg=T['bg'], fg=T['animal'],
+                font=(MONO, 16), justify='center')
+            self.label_animal.pack(pady=(20, 0))
+
+            self.label_timer = tk.Label(f, bg=T['bg'], fg=T['timer'],
+                font=(SANS, 22))
+            self.label_timer.pack(pady=(16, 0))
+
+            self.progress = ttk.Progressbar(f, style="custom.Horizontal.TProgressbar",
+                length=380, mode='determinate')
+            self.progress.pack(pady=(10, 8))
+
+            pool = _CURIOSIDADES + _MOTIVACIONALES if MODO == 'visual' else _EJERCICIOS + _MOTIVACIONALES
+            self.label_info = tk.Label(f, bg=T['bg'], fg=T['info'],
+                font=(SANS, 16, 'italic'), wraplength=600)
+            self.label_info.pack(pady=(16, 0))
+            self.label_info.config(text=random.choice(pool))
+        else:
+            icon_lines = BOWL if MODO == 'almuerzo' else MOON if MODO == 'dormir' else WATER
+            icon_text = '\n'.join(l.center(max(len(r) for r in icon_lines)) for l in icon_lines)
+            tk.Label(f, bg=T['bg'], fg=T['animal'],
+                font=(MONO, 16), text=icon_text, justify='center').pack(pady=(20, 0))
+
+            tk.Label(f, bg=T['bg'], fg=T['title'],
+                font=(SANS, 36, 'bold'), text=T['title_txt']).pack(pady=(20, 0))
+
+            pool = _COMIDAS if MODO == 'almuerzo' else _DORMIR_TIPS if MODO == 'dormir' else _AGUA_MSGS
+            tk.Label(f, bg=T['bg'], fg=T['text'],
+                font=(SANS, 20), wraplength=600, text=random.choice(pool)).pack(pady=(12, 0))
+
+            foot = "Bebe despacio, disfruta cada sorbo." if MODO == 'agua' else "Tómate tu tiempo, la pantalla seguirá aquí."
+            tk.Label(f, bg=T['bg'], fg=T['info'],
+                font=(SANS, 14, 'italic'), text=foot).pack(pady=(12, 0))
+
+        stats_line = get_stats_line(self.stats)
+        self.label_stats = tk.Label(f, bg=T['bg'], fg=T['date'],
+            font=(SANS, 13))
+        self.label_stats.pack(pady=(12, 0))
+        self.label_stats.config(text=stats_line)
+
+        weekly_line = get_weekly_line(self.stats)
+        if weekly_line:
+            tk.Label(f, bg=T['bg'], fg=T['date'],
+                font=(SANS, 12), text=weekly_line).pack()
+
+        if not TIENE_TIMER:
+            auto_ms = 10000 if MODO == 'agua' else 600000
+            self.root.after(auto_ms, self.do_skip)
+
+        btn_text = "Cerrar" if not TIENE_TIMER else "Desbloquear"
+        self.btn = tk.Button(f, text=btn_text,
+            font=(SANS, 16, 'bold'), bg=T['btn'], fg='white',
+            activebackground=T['bord'], activeforeground='white',
+            bd=2, relief='solid', highlightbackground=T['bord'],
+            cursor='hand2', padx=40, pady=12)
+        self.btn.config(command=self.do_skip)
+        if TIENE_TIMER:
+            self.btn.pack_forget()
+        else:
+            self.btn.pack(pady=(16, 0))
+
+        hint = "Espacio: saltar  ·  Z: snooze 5 min" if TIENE_TIMER else "Espacio o Z: cerrar"
+        tk.Label(f, bg=T['bg'], fg=T['date'],
+            font=(SANS, 11), text=hint).pack(pady=(8, 0))
+
+    def _bind_keys(self):
+        self.root.bind('<Key-space>', lambda e: self.do_skip())
+        self.root.bind('<Key-z>', lambda e: self.do_snooze())
+        self.root.bind('<Key-Z>', lambda e: self.do_snooze())
+        self.root.bind('<Escape>', lambda e: self.do_skip() if (not TIENE_TIMER or self.tiempo_restante <= 0) else None)
+        self.root.bind('<Return>', lambda e: self.do_skip() if (self.btn.winfo_viewable()) else None)
+        self.root.bind('<KP_Enter>', lambda e: self.do_skip() if (self.btn.winfo_viewable()) else None)
+
+    def _tick(self):
+        ahora = time.localtime()
+        self.label_clock.config(text=time.strftime("%H:%M", ahora))
+        self.label_date.config(text=time.strftime("%A, %d de %B de %Y", ahora).capitalize())
+        self.root.after(1000, self._tick)
+
+    def _animar(self):
+        self.frame_idx = (self.frame_idx + 1) % len(FRAMES)
+        self.label_animal.config(text='\n'.join(FRAMES[self.frame_idx]))
+        self.root.after(400, self._animar)
+
+    def _timer_tick(self):
+        transcurrido = time.monotonic() - self.inicio
+        restante = max(0, SEGUNDOS - transcurrido)
+        self.tiempo_restante = int(restante)
+        pct = min(transcurrido / SEGUNDOS, 1.0) * 100
+        self.progress['value'] = pct
+        self.label_timer.config(text=f"Descansa {int(restante)} segundos más…")
+
+        if restante <= 0:
+            self.progress['value'] = 100
+            self.label_timer.config(text="¡Ya puedes continuar!")
+            self.btn.pack(pady=(16, 0))
+            return
+
+        self.root.after(100, self._timer_tick)
+
+    def _cleanup(self):
+        if not self.stats_updated:
+            self.stats = increment_stat(MODO)
+            self.stats_updated = True
+
+    def do_snooze(self):
+        write_snooze()
+        self._cleanup()
+        self.root.destroy()
+
+    def do_skip(self):
+        self._cleanup()
+        self.root.destroy()
+
+
+if __name__ == "__main__":
+    app = PantallaDescanso()
+    app.root.mainloop()

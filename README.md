@@ -1,51 +1,66 @@
 # Descanso Visual
 
 Recordatorio automático de pausas con pantalla simulada de bloqueo.
+Un solo código **Python + tkinter** para Linux y Windows.
 
 ## Características
 
-- **4 modos + agua**: visual (20 min), activo (60 min), almuerzo (12:00), dormir (22:30), agua (30 min)
+- **5 modos**: visual (20 min), activo (60 min), agua (30 min), almuerzo (12:00), dormir (22:30)
 - **ASCII art animado**: perro o gato con animaciones
-- **Teclas de control**: Espacio para saltar, Z para snooze 5 min
-- **Sonido**: beep al iniciar cada pausa
+- **Teclas**: Espacio saltar, Z snooze 5 min, Escape cerrar, Enter desbloquear
+- **Sonido**: beep al iniciar cada pausa (ffplay o winsound)
+- **Música lo-fi**: opcional durante las pausas
 - **Tema claro/oscuro**: auto (según hora) o manual
 - **Estadísticas**: hoy y semana, mostradas en pantalla y logs
-- **Mensajes personalizados**: edita `messages.json` para agregar tus propios textos
 - **Clima**: muestra el clima actual (configura `weather_city`)
-- **Citas motivacionales**: mezcladas con curiosidades y ejercicios
-- **Música lo-fi**: opcional durante las pausas
+- **Mensajes personalizados**: edita `messages.json`
 
 ## Linux
 
 ```bash
+# instalar
+cp descanso ~/.local/bin/
+cp pantalla-descanso ~/.local/bin/
+
 # iniciar ahora
 systemctl --user start descanso
 
-# auto-inicio al prender el PC
+# auto-inicio
 systemctl --user enable descanso
 
-# ver logs
+# logs
 journalctl --user -u descanso -f
 
-# ejecutar manualmente (sin systemd)
+# ejecutar manual
 ~/.local/bin/descanso
 ```
 
-Requiere: `python3` + `gtk3` (PyGObject) + `ffplay` (para música y sonido).
+Requiere: `python3` + `tkinter` (viene con Python) + `ffplay` (para sonido/música, opcional).
 
 ## Windows
 
-### Opcion A: .exe (recomendado)
+### Opción A: .exe (recomendado)
 
-1. Ejecutar `windows\build.bat` (instala ps2exe y compila los .exe)
-2. **Auto-inicio:** `Win+R` → `shell:startup` → acceso directo a `windows\descanso.exe`
-3. O ejecutar `windows\descanso.exe` manualmente
+1. Ejecutar `windows\build.bat` — convierte los scripts a .exe con ps2exe
+2. Copiar `windows\descanso.exe` y `windows\pantalla-descanso.exe` a `C:\Users\tuUsuario\scripts\`
+3. **Auto-inicio:** `Win+R` → `shell:startup` → acceso directo a `descanso.exe`
 
-### Opcion B: PowerShell scripts
+### Opción B: Python directo
 
-1. Copiar `windows/` a `C:\Users\tuUsuario\scripts\`
-2. **Auto-inicio:** `Win+R` → `shell:startup` → acceso directo a `descanso.bat`
-3. O manual: ejecutar `descanso.bat`
+1. Instalar Python 3 (con tkinter incluido)
+2. Ejecutar `python descanso` desde la terminal
+
+## Instalación desde cero
+
+```bash
+git clone git@github.com:bramendev/descansa-pls.git
+cd descansa-pls
+cp descanso ~/.local/bin/
+cp pantalla-descanso ~/.local/bin/
+# Linux: copiar servicio systemd
+cp linux/descanso.service ~/.config/systemd/user/
+systemctl --user daemon-reload
+```
 
 ## Controles en pantalla
 
@@ -54,7 +69,7 @@ Requiere: `python3` + `gtk3` (PyGObject) + `ffplay` (para música y sonido).
 | `Espacio` | Saltar pausa actual |
 | `Z` | Snooze: pospone la próxima pausa 5 min |
 | `Enter` | Desbloquear (cuando el timer termina) |
-| `Escape` | Cerrar (cuando el timer termina o en modos sin timer) |
+| `Escape` | Cerrar (cuando el timer termina o modos sin timer) |
 
 ## Configuración
 
@@ -78,63 +93,15 @@ Editar `~/.config/descanso-visual/config.json`:
 }
 ```
 
-| Campo | Descripción | Default |
-|---|---|---|
-| `visual_interval_min` | Minutos entre pausas visuales | 20 |
-| `visual_duration_sec` | Segundos de pausa visual | 30 |
-| `active_interval_min` | Minutos entre pausas activas | 60 |
-| `active_duration_sec` | Segundos de pausa activa | 180 |
-| `water_interval_min` | Minutos entre recordatorios de agua | 30 |
-| `water_duration_sec` | Segundos del recordatorio de agua | 10 |
-| `lunch_time` | Hora de almuerzo (HH:MM) | 12:00 |
-| `sleep_time` | Hora de dormir (HH:MM) | 22:30 |
-| `music_url` | URL de música lo-fi (vacío = desactivar) | FluxFM |
-| `animal` | `perro` o `gato` | perro |
-| `theme` | `dark`, `light`, o `auto` | dark |
-| `weather_city` | Ciudad para el clima (vacío = desactivar) | vacío |
-| `sound` | Sonido al iniciar pausa | true |
-
-## Mensajes personalizados
-
-Editar `~/.config/descanso-visual/messages.json`:
-
-```json
-{
-  "curiosidades": ["Mi dato curioso 1", "Mi dato curioso 2"],
-  "ejercicios": ["Mi ejercicio 1"],
-  "motivacionales": ["Mi frase motivacional"],
-  "comidas": ["Mi consejo de comida"],
-  "dormir": ["Mi tip para dormir"],
-  "agua": ["Mi mensaje de hidratación"]
-}
-```
-
-Los mensajes personalizados se mezclan con los incorporados.
-
 ## Modos de pantalla
 
-| Modo | Cuándo | Qué muestra | Duración |
-|---|---|---|---|
-| Visual | Cada 20 min | Reloj, animal, cuenta atrás, curiosidad/motivacional, clima, stats | 30s |
-| Activo | Cada 60 min | Reloj, animal, cuenta atrás, ejercicio/motivacional, clima, stats | 3 min |
-| Agua | Cada 30 min | Reloj, gota de agua, mensaje hidratación, clima, stats | 10s |
-| Almuerzo | 12:00 | Reloj, cuenco, sugerencia comida, clima, stats | auto 10 min |
-| Dormir | 22:30 | Reloj, luna, tip sueño, clima, stats | auto 10 min |
-
-## Estadísticas
-
-Se guardan en `~/.config/descanso-visual/stats.json`.
-Cada pantalla muestra:
-- Contador del día: "👁 3 visuales  ·  🏃 1 activas  ·  💧 2 aguas"
-- Contador semanal: "Semana: 👁 15 visuales  ·  🏃 4 activas"
-
-El scheduler también muestra stats en los logs tras cada pausa.
-
-## ASCII Art
-
-Clásicos de internet:
-- **Perro**: perfil con cola animada
-- **Gato**: Felix Lee dormido con parpadeo
+| Modo | Cuándo | Duración |
+|---|---|---|
+| Visual | Cada 20 min | 30s |
+| Activo | Cada 60 min | 3 min |
+| Agua | Cada 30 min | 10s |
+| Almuerzo | 12:00 | 10 min auto |
+| Dormir | 22:30 | 10 min auto |
 
 ## Archivos de configuración
 
