@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+MINUTOS=${1:-20}
+SEGUNDOS_DESCANSO=${2:-30}
+INTERVALO=$((MINUTOS * 60))
+
+WSL=false
+[[ -n "${WSL_DISTRO_NAME:-}" ]] && WSL=true
+
+PANTALLA="$HOME/.local/bin/pantalla-descanso"
+
+notificar_wsl() {
+    local titulo="$1" msg="$2"
+    if command -v powershell.exe &>/dev/null; then
+        powershell.exe -Command "
+            [Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] > \$null
+            \$template = [Windows.UI.Notifications.ToastNotificationManager]::GetTemplateContent([Windows.UI.Notifications.ToastTemplateType]::ToastText02)
+            \$text = \$template.GetElementsByTagName('text')
+            \$text[0].AppendChild(\$template.CreateTextNode('$titulo')) > \$null
+            \$text[1].AppendChild(\$template.CreateTextNode('$msg')) > \$null
+            \$toast = [Windows.UI.Notifications.ToastNotification]::new(\$template)
+            [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier().Show(\$toast)
+        " 2>/dev/null || true
+    fi
+}
+
+while true; do
+    sleep "$INTERVALO"
+    if $WSL; then
+        notificar_wsl "Descanso Visual" "Llevas $MINUTOS min frente a la pantalla. Mira al menos $SEGUNDOS_DESCANSO s algo a >6 m."
+    elif [ -x "$PANTALLA" ]; then
+        "$PANTALLA" "$SEGUNDOS_DESCANSO"
+    else
+        notify-send -u critical -t 20000 "Descanso Visual" \
+            "Llevas $MINUTOS min frente a la pantalla. Mira al menos $SEGUNDOS_DESCANSO s algo a >6 m."
+    fi
+done

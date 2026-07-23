@@ -1,0 +1,13 @@
+[Unit]
+Description=Recordatorio de descanso visual cada 20 min
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/descanso
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

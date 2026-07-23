@@ -1,0 +1,186 @@
+#!/usr/bin/env python3
+import gi
+gi.require_version('Gtk', '3.0')
+gi.require_version('GLib', '2.0')
+from gi.repository import Gtk, GLib, Gdk, Pango
+import random
+import time
+import sys
+import signal
+
+SEGUNDOS = int(sys.argv[1]) if len(sys.argv) > 1 else 30
+
+CURIOSIDADES = [
+    "Los pulpos tienen tres corazones y su sangre es azul.",
+    "Un día en Venus dura más que un año en Venus.",
+    "Las hormigas nunca duermen. En cambio, toman micro-siestas de 8 segundos.",
+    "El corazón humano late unas 100.000 veces al día.",
+    "Los árboles se comunican entre sí a través de una red de hongos llamada 'Wood Wide Web'.",
+    "El agua caliente se congela más rápido que el agua fría (efecto Mpemba).",
+    "Los flamencos no nacen rosados, se vuelven rosados por su alimentación.",
+    "El tiburón ballena tiene más de 3.000 dientes, pero no los usa para masticar.",
+    "Tu intestino delgado mide aproximadamente 7 metros de largo.",
+    "La miel nunca se echa a perder. Se encontró miel comestible en tumbas egipcias de 3.000 años.",
+    "El pulpo tiene 8 brazos, 3 corazones y 9 cerebros.",
+    "Las nubes no son ingrávidas; una nube típica pesa unas 500 toneladas.",
+    "El ojo humano puede distinguir unos 10 millones de colores distintos.",
+    "El animal más longevo es la almeja de Islandia, que vive más de 500 años.",
+    "La Gran Muralla China no es visible desde el espacio a simple vista.",
+    "Los koalas tienen huellas dactilares casi idénticas a las humanas.",
+    "La Tierra viaja a 107.000 km/h alrededor del Sol.",
+    "El nombre completo del pato Donald es Donald Fauntleroy Duck.",
+    "Una persona promedio pasa 6 meses de su vida esperando semáforos en verde.",
+    "Los chiles picantes miden su picor en la escala Scoville.",
+    "Las jirafas solo necesitan dormir 30 minutos al día.",
+    "El metal más caro del mundo es el rodio, no el oro.",
+    "Apagar la vista 20 segundos cada 20 minutos reduce la fatiga visual en un 40%.",
+    "El parpadeo promedio dura 1/10 de segundo.",
+    "Mirar algo a 6 metros de distancia relaja los músculos oculares.",
+    "El músculo más rápido del cuerpo es el que controla el párpado.",
+    "Los bebés nacen sin rótulas; se desarrollan entre los 2 y 6 años.",
+    "Las huellas de la lengua son tan únicas como las huellas dactilares.",
+    "El ADN humano tiene un 50% de similitud con el de un plátano.",
+    "Las avestruces no entierran la cabeza en la arena; es un mito.",
+    "El trueno puede oírse hasta 25 km de distancia del rayo.",
+    "La mariposa monarca viaja 4.000 km cada año para migrar.",
+    "Una persona produce suficiente saliva en su vida para llenar dos piscinas.",
+    "Las estrellas de mar pueden regenerar un brazo perdido.",
+    "El brócoli tiene más proteína que el filete por cada 100 calorías.",
+    "Las focas pueden aguantar la respiración hasta 2 horas bajo el agua.",
+    "El 60% del cuerpo humano es agua.",
+    "Los delfines duermen con un ojo abierto y la mitad del cerebro despierta.",
+    "Hay más estrellas en el universo que granos de arena en todas las playas.",
+    "La luz tarda 8 minutos y 20 segundos en viajar del Sol a la Tierra.",
+    "El papel higiénico se inventó en China en el siglo II d.C.",
+    "El chocolate blanco no es chocolate (no tiene pasta de cacao).",
+    "Los gatos no pueden saborear lo dulce.",
+    "El cabello humano crece unos 15 cm al año.",
+    "Las vacas tienen mejor amigos y se estresan si se separan de ellos.",
+    "Un grupo de medusas se llama 'floración' o 'enjambre'.",
+    "La batería de tu teléfono tiene más potencia que la que usó el Apolo 11 para llegar a la luna.",
+    "El queso más caro del mundo se hace con leche de burra.",
+    "La risa libera endorfinas y reduce el estrés.",
+    "Tu cuerpo reemplaza millones de células cada segundo.",
+    "Las pirámides de Egipto se construyeron con más precisión que muchos edificios modernos.",
+    "Los pingüinos proponen matrimonio con una piedra.",
+    "El ombligo humano alberga unas 1.400 especies de bacterias.",
+]
+
+
+class PantallaDescanso(Gtk.Window):
+    def __init__(self):
+        super().__init__(type=Gtk.WindowType.TOPLEVEL)
+        self.set_title("Descanso Visual")
+        self.set_position(Gtk.WindowPosition.CENTER)
+        self.set_resizable(False)
+        self.set_decorated(False)
+        self.set_keep_above(True)
+        self.fullscreen()
+
+        self.tiempo_restante = SEGUNDOS
+        self.inicio = time.monotonic()
+
+        screen = self.get_screen()
+        visual = screen.get_rgba_visual()
+        if visual:
+            self.set_visual(visual)
+
+        css = b"""
+        window { background: #0a0a1a; }
+        #clock { font-size: 96px; font-weight: bold; color: #e0e0ff; }
+        #date  { font-size: 20px; color: #9090b0; margin-top: -10px; }
+        #timer-text { font-size: 28px; color: #ffcc66; margin-top: 30px; }
+        #fact { font-size: 18px; color: #b0b0d0; font-style: italic; margin-top: 40px; }
+        #progress trough { min-height: 8px; border-radius: 4px; background: #1a1a3a; }
+        #progress progress { min-height: 8px; border-radius: 4px; background: #6688ff; }
+        #unlock-btn { font-size: 18px; padding: 12px 40px; background: #3344aa; color: white;
+                      border: 2px solid #5566cc; border-radius: 8px; }
+        #unlock-btn:hover { background: #4455cc; }
+        """
+        provider = Gtk.CssProvider()
+        provider.load_from_data(css)
+        Gtk.StyleContext.add_provider_for_screen(screen, provider,
+            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+
+        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        vbox.set_valign(Gtk.Align.CENTER)
+        vbox.set_halign(Gtk.Align.CENTER)
+        self.add(vbox)
+
+        self.label_clock = Gtk.Label(name="clock")
+        vbox.pack_start(self.label_clock, False, False, 0)
+
+        self.label_date = Gtk.Label(name="date")
+        vbox.pack_start(self.label_date, False, False, 10)
+
+        self.label_timer = Gtk.Label(name="timer-text")
+        vbox.pack_start(self.label_timer, False, False, 0)
+
+        self.progress = Gtk.ProgressBar(name="progress")
+        self.progress.set_size_request(400, -1)
+        self.progress.set_margin_top(20)
+        self.progress.set_margin_bottom(10)
+        vbox.pack_start(self.progress, False, False, 0)
+
+        self.label_fact = Gtk.Label(name="fact", label=random.choice(CURIOSIDADES))
+        self.label_fact.set_line_wrap(True)
+        self.label_fact.set_max_width_chars(50)
+        self.label_fact.set_margin_top(20)
+        vbox.pack_start(self.label_fact, False, False, 0)
+
+        self.btn_unlock = Gtk.Button(label="Desbloquear", name="unlock-btn")
+        self.btn_unlock.set_margin_top(40)
+        self.btn_unlock.connect("clicked", self.on_unlock)
+        self.btn_unlock.set_visible(False)
+        vbox.pack_start(self.btn_unlock, False, False, 0)
+
+        self.actualizar_reloj()
+
+        GLib.timeout_add(100, self.actualizar_timer)
+        GLib.timeout_add(1000, self.actualizar_reloj)
+
+        self.connect("key-press-event", self.on_key)
+        self.connect("destroy", Gtk.main_quit)
+        self.connect("delete-event", lambda w, e: True)
+
+    def actualizar_reloj(self):
+        ahora = time.localtime()
+        self.label_clock.set_text(time.strftime("%H:%M", ahora))
+        self.label_date.set_text(time.strftime("%A, %d de %B de %Y", ahora).capitalize())
+        return True
+
+    def actualizar_timer(self):
+        transcurrido = time.monotonic() - self.inicio
+        restante = max(0, SEGUNDOS - transcurrido)
+        self.tiempo_restante = int(restante)
+
+        fraccion = transcurrido / SEGUNDOS
+        self.progress.set_fraction(min(fraccion, 1.0))
+        self.label_timer.set_text(f"Descansa {int(restante)} segundos más…")
+
+        if restante <= 0:
+            self.progress.set_fraction(1.0)
+            self.label_timer.set_text("¡Ya puedes continuar!")
+            self.btn_unlock.set_visible(True)
+            self.btn_unlock.grab_focus()
+            return False
+
+        return True
+
+    def on_unlock(self, _btn):
+        Gtk.main_quit()
+
+    def on_key(self, _widget, event):
+        if event.keyval == Gdk.KEY_Escape and self.tiempo_restante <= 0:
+            Gtk.main_quit()
+        if event.keyval == Gdk.KEY_Return and self.tiempo_restante <= 0:
+            if self.btn_unlock.get_visible():
+                Gtk.main_quit()
+        return True
+
+
+if __name__ == "__main__":
+    signal.signal(signal.SIGINT, signal.SIG_DFL)
+    app = PantallaDescanso()
+    app.show_all()
+    Gtk.main()
