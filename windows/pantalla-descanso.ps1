@@ -129,6 +129,61 @@ function HexToColor($hex) {
     return [System.Drawing.Color]::FromArgb($r, $g, $b)
 }
 
+# --- Stats ---
+$configDir = Join-Path $env:USERPROFILE ".config\descanso-visual"
+$statsFile = Join-Path $configDir "stats.json"
+
+function Load-Stats {
+    try {
+        if (Test-Path $statsFile) {
+            return Get-Content $statsFile -Raw | ConvertFrom-Json
+        }
+    } catch {}
+    return @{
+        visual = @{ total = 0; today = 0; date = "" }
+        activo = @{ total = 0; today = 0; date = "" }
+        almuerzo = @{ total = 0; today = 0; date = "" }
+        dormir = @{ total = 0; today = 0; date = "" }
+    }
+}
+
+function Save-Stats($stats) {
+    if (-not (Test-Path $configDir)) { New-Item -ItemType Directory -Path $configDir -Force | Out-Null }
+    $stats | ConvertTo-Json -Depth 3 | Set-Content $statsFile
+}
+
+function Increment-Stat($modo) {
+    $stats = Load-Stats
+    $today = (Get-Date).ToString("yyyy-MM-dd")
+    if (-not $stats.$modo) { $stats.$modo = @{ total = 0; today = 0; date = $today } }
+    if ($stats.$modo.date -ne $today) { $stats.$modo.today = 0 }
+    $stats.$modo.total++
+    $stats.$modo.today++
+    $stats.$modo.date = $today
+    Save-Stats $stats
+    return $stats
+}
+
+function Get-Stats-Line($stats) {
+    $today = (Get-Date).ToString("yyyy-MM-dd")
+    $parts = @()
+    $labels = @{ visual = "visuales"; activo = "activas"; almuerzo = "almuerzos"; dormir = "dormir" }
+    foreach ($modo in @("visual", "activo", "almuerzo", "dormir")) {
+        if ($stats.$modo) {
+            $t = if ($stats.$modo.date -eq $today) { $stats.$modo.today } else { 0 }
+            if ($t -gt 0) {
+                $parts += "$t $($labels[$modo])"
+            }
+        }
+    }
+    if ($parts.Count -eq 0) { return "Hoy aún no hay pausas registradas" }
+    return $parts -join "  ·  "
+}
+
+$stats = Load-Stats
+$statsLine = Get-Stats-Line $stats
+$statsUpdated = $false
+
 # --- Form ---
 $form = New-Object System.Windows.Forms.Form
 $form.Text = $T.titulo
@@ -147,21 +202,21 @@ $frameCounter = 0
 
 # --- Clock ---
 $reloj = New-Object System.Windows.Forms.Label
-$reloj.Font = New-Object System.Drawing.Font("Segoe UI", 72, [System.Drawing.FontStyle]::Bold)
+$reloj.Font = New-Object System.Drawing.Font("Segoe UI", 80, [System.Drawing.FontStyle]::Bold)
 $reloj.ForeColor = HexToColor $T.clock
 $reloj.BackColor = [System.Drawing.Color]::Transparent
 $reloj.TextAlign = "MiddleCenter"
-$reloj.Size = New-Object System.Drawing.Size(600, 120)
-$reloj.Location = New-Object System.Drawing.Point(0, 180)
+$reloj.Size = New-Object System.Drawing.Size(600, 130)
+$reloj.Location = New-Object System.Drawing.Point(0, 160)
 
 # --- Date ---
 $fecha = New-Object System.Windows.Forms.Label
-$fecha.Font = New-Object System.Drawing.Font("Segoe UI", 18)
+$fecha.Font = New-Object System.Drawing.Font("Segoe UI", 16)
 $fecha.ForeColor = HexToColor $T.date
 $fecha.BackColor = [System.Drawing.Color]::Transparent
 $fecha.TextAlign = "MiddleCenter"
-$fecha.Size = New-Object System.Drawing.Size(500, 40)
-$fecha.Location = New-Object System.Drawing.Point(0, 300)
+$fecha.Size = New-Object System.Drawing.Size(500, 30)
+$fecha.Location = New-Object System.Drawing.Point(0, 290)
 
 $form.Controls.Add($reloj)
 $form.Controls.Add($fecha)
@@ -170,12 +225,12 @@ $form.Controls.Add($fecha)
 if ($tieneTimer) {
     # Animal
     $animalLabel = New-Object System.Windows.Forms.Label
-    $animalLabel.Font = New-Object System.Drawing.Font("Consolas", 18)
+    $animalLabel.Font = New-Object System.Drawing.Font("Consolas", 16)
     $animalLabel.ForeColor = HexToColor $T.animal
     $animalLabel.BackColor = [System.Drawing.Color]::Transparent
     $animalLabel.TextAlign = "MiddleCenter"
     $animalLabel.Size = New-Object System.Drawing.Size(400, 100)
-    $animalLabel.Location = New-Object System.Drawing.Point(0, 340)
+    $animalLabel.Location = New-Object System.Drawing.Point(0, 330)
 
     # Timer text
     $timerLabel = New-Object System.Windows.Forms.Label
@@ -188,7 +243,7 @@ if ($tieneTimer) {
 
     # Progress bar
     $barra = New-Object System.Windows.Forms.ProgressBar
-    $barra.Size = New-Object System.Drawing.Size(400, 10)
+    $barra.Size = New-Object System.Drawing.Size(400, 12)
     $barra.Location = New-Object System.Drawing.Point(0, 490)
     $barra.Style = "Continuous"
     $barra.ForeColor = HexToColor $T.pfill
@@ -203,15 +258,25 @@ if ($tieneTimer) {
     $infoLabel.Size = New-Object System.Drawing.Size(600, 60)
     $infoLabel.Location = New-Object System.Drawing.Point(0, 520)
     if ($Modo -eq "visual") { $infoLabel.Text = $curiosidades | Get-Random }
-    else { $infoLabel.Text = $consejos | Get-Random }
+    else { $infoLabel.Text = $ejercicios | Get-Random }
 
-    $form.Controls.AddRange(@($animalLabel, $timerLabel, $barra, $infoLabel))
+    # Stats text
+    $statsLabel = New-Object System.Windows.Forms.Label
+    $statsLabel.Font = New-Object System.Drawing.Font("Segoe UI", 14)
+    $statsLabel.ForeColor = HexToColor $T.date
+    $statsLabel.BackColor = [System.Drawing.Color]::Transparent
+    $statsLabel.TextAlign = "MiddleCenter"
+    $statsLabel.Size = New-Object System.Drawing.Size(600, 30)
+    $statsLabel.Location = New-Object System.Drawing.Point(0, 590)
+    $statsLabel.Text = $statsLine
+
+    $form.Controls.AddRange(@($animalLabel, $timerLabel, $barra, $infoLabel, $statsLabel))
 
     # Close button (hidden until timer ends)
     $btnUnlock = New-Object System.Windows.Forms.Button
-    $btnUnlock.Font = New-Object System.Drawing.Font("Segoe UI", 16)
+    $btnUnlock.Font = New-Object System.Drawing.Font("Segoe UI", 16, [System.Drawing.FontStyle]::Bold)
     $btnUnlock.Text = "Desbloquear"
-    $btnUnlock.Size = New-Object System.Drawing.Size(200, 50)
+    $btnUnlock.Size = New-Object System.Drawing.Size(220, 50)
     $btnUnlock.FlatStyle = "Flat"
     $btnUnlock.FlatAppearance.BorderSize = 2
     $btnUnlock.BackColor = HexToColor $T.btn
@@ -219,7 +284,16 @@ if ($tieneTimer) {
     $btnUnlock.FlatAppearance.BorderColor = HexToColor $T.btn
     $btnUnlock.Visible = $false
     $form.Controls.Add($btnUnlock)
-    $btnUnlock.Add_Click({ $form.Close() })
+
+    function Update-Stats-And-Close {
+        if (-not $statsUpdated) {
+            $script:stats = Increment-Stat $Modo
+            $script:statsUpdated = $true
+        }
+        $form.Close()
+    }
+
+    $btnUnlock.Add_Click({ Update-Stats-And-Close })
 
     # Animal animation timer (400ms)
     $animTimer = New-Object System.Windows.Forms.Timer
@@ -263,23 +337,23 @@ else {
     # Icon
     $iconLines = if ($Modo -eq "almuerzo") { $bowl } else { $moon }
     $iconLabel = New-Object System.Windows.Forms.Label
-    $iconLabel.Font = New-Object System.Drawing.Font("Consolas", 18)
+    $iconLabel.Font = New-Object System.Drawing.Font("Consolas", 16)
     $iconLabel.ForeColor = HexToColor $T.animal
     $iconLabel.BackColor = [System.Drawing.Color]::Transparent
     $iconLabel.TextAlign = "MiddleCenter"
     $iconLabel.Size = New-Object System.Drawing.Size(400, 120)
-    $iconLabel.Location = New-Object System.Drawing.Point(0, 330)
+    $iconLabel.Location = New-Object System.Drawing.Point(0, 310)
     $iconLabel.Text = ($iconLines | ForEach-Object { $_.PadLeft($maxW).PadRight($maxW) }) -join "`n"
     $form.Controls.Add($iconLabel)
 
     # Title
     $titleLabel = New-Object System.Windows.Forms.Label
-    $titleLabel.Font = New-Object System.Drawing.Font("Segoe UI", 38, [System.Drawing.FontStyle]::Bold)
+    $titleLabel.Font = New-Object System.Drawing.Font("Segoe UI", 36, [System.Drawing.FontStyle]::Bold)
     $titleLabel.ForeColor = HexToColor $T.title
     $titleLabel.BackColor = [System.Drawing.Color]::Transparent
     $titleLabel.TextAlign = "MiddleCenter"
     $titleLabel.Size = New-Object System.Drawing.Size(600, 60)
-    $titleLabel.Location = New-Object System.Drawing.Point(0, 450)
+    $titleLabel.Location = New-Object System.Drawing.Point(0, 430)
     $titleLabel.Text = $T.titulo
     $form.Controls.Add($titleLabel)
 
@@ -292,7 +366,7 @@ else {
         $textLabel.BackColor = [System.Drawing.Color]::Transparent
         $textLabel.TextAlign = "MiddleCenter"
         $textLabel.Size = New-Object System.Drawing.Size(600, 40)
-        $textLabel.Location = New-Object System.Drawing.Point(0, 520)
+        $textLabel.Location = New-Object System.Drawing.Point(0, 500)
         $textLabel.Text = $items | Get-Random
         $form.Controls.Add($textLabel)
     }
@@ -304,38 +378,73 @@ else {
     $footLabel.BackColor = [System.Drawing.Color]::Transparent
     $footLabel.TextAlign = "MiddleCenter"
     $footLabel.Size = New-Object System.Drawing.Size(600, 30)
-    $footLabel.Location = New-Object System.Drawing.Point(0, 570)
+    $footLabel.Location = New-Object System.Drawing.Point(0, 550)
     $footLabel.Text = "Tómate tu tiempo, la pantalla seguirá aquí."
     $form.Controls.Add($footLabel)
 
+    # Stats text
+    $statsLabel = New-Object System.Windows.Forms.Label
+    $statsLabel.Font = New-Object System.Drawing.Font("Segoe UI", 14)
+    $statsLabel.ForeColor = HexToColor $T.date
+    $statsLabel.BackColor = [System.Drawing.Color]::Transparent
+    $statsLabel.TextAlign = "MiddleCenter"
+    $statsLabel.Size = New-Object System.Drawing.Size(600, 30)
+    $statsLabel.Location = New-Object System.Drawing.Point(0, 590)
+    $statsLabel.Text = $statsLine
+    $form.Controls.Add($statsLabel)
+
     # Close button (always visible)
     $btnClose = New-Object System.Windows.Forms.Button
-    $btnClose.Font = New-Object System.Drawing.Font("Segoe UI", 16)
+    $btnClose.Font = New-Object System.Drawing.Font("Segoe UI", 16, [System.Drawing.FontStyle]::Bold)
     $btnClose.Text = "Cerrar"
-    $btnClose.Size = New-Object System.Drawing.Size(200, 50)
+    $btnClose.Size = New-Object System.Drawing.Size(220, 50)
     $btnClose.FlatStyle = "Flat"
     $btnClose.FlatAppearance.BorderSize = 2
     $btnClose.BackColor = HexToColor $T.btn
     $btnClose.ForeColor = [System.Drawing.Color]::White
     $btnClose.FlatAppearance.BorderColor = HexToColor $T.btn
-    $btnClose.Location = New-Object System.Drawing.Point(0, 620)
+    $btnClose.Location = New-Object System.Drawing.Point(0, 630)
     $form.Controls.Add($btnClose)
-    $btnClose.Add_Click({ $form.Close() })
+    $btnClose.Add_Click({
+        if (-not $statsUpdated) {
+            $script:stats = Increment-Stat $Modo
+            $script:statsUpdated = $true
+        }
+        $form.Close()
+    })
 
     # Close after 10 min
     $closeTimer = New-Object System.Windows.Forms.Timer
     $closeTimer.Interval = 600000
-    $closeTimer.Add_Tick({ $form.Close() })
+    $closeTimer.Add_Tick({
+        if (-not $statsUpdated) {
+            $script:stats = Increment-Stat $Modo
+            $script:statsUpdated = $true
+        }
+        $form.Close()
+    })
     $closeTimer.Start()
 }
 
 # --- Events ---
 $form.Add_KeyDown({
     if ($_.KeyCode -eq "Escape") {
-        if (-not $tieneTimer -or $tiempoRestante -le 0) { $form.Close() }
+        if (-not $tieneTimer -or $tiempoRestante -le 0) {
+            if (-not $statsUpdated) {
+                $script:stats = Increment-Stat $Modo
+                $script:statsUpdated = $true
+            }
+            $form.Close()
+        }
     }
     if ($_.KeyCode -eq "Enter") {
-        if ($btnUnlock.Visible) { $form.Close() }
+        if ($btnUnlock.Visible) {
+            if (-not $statsUpdated) {
+                $script:stats = Increment-Stat $Modo
+                $script:statsUpdated = $true
+            }
+            $form.Close()
+        }
     }
 })
 
@@ -348,12 +457,15 @@ $form.Add_Shown({
         $timerLabel.Left = ($form.ClientSize.Width - $timerLabel.Width) / 2
         $barra.Left = ($form.ClientSize.Width - $barra.Width) / 2
         $infoLabel.Left = ($form.ClientSize.Width - $infoLabel.Width) / 2
+        $statsLabel.Left = ($form.ClientSize.Width - $statsLabel.Width) / 2
+        $btnUnlock.Top = $statsLabel.Top + 50
         $btnUnlock.Left = ($form.ClientSize.Width - $btnUnlock.Width) / 2
     } else {
         $iconLabel.Left = ($form.ClientSize.Width - $iconLabel.Width) / 2
         $titleLabel.Left = ($form.ClientSize.Width - $titleLabel.Width) / 2
         if ($textLabel) { $textLabel.Left = ($form.ClientSize.Width - $textLabel.Width) / 2 }
         $footLabel.Left = ($form.ClientSize.Width - $footLabel.Width) / 2
+        $statsLabel.Left = ($form.ClientSize.Width - $statsLabel.Width) / 2
         $btnClose.Left = ($form.ClientSize.Width - $btnClose.Width) / 2
     }
 })
