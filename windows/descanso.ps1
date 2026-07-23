@@ -111,12 +111,20 @@ function Launch-Break($mode, $duration) {
 
 # Music
 function Play-Music($duration) {
-    if (-not $musicUrl) { return }
-    try { Start-Process ffplay -ArgumentList "-nodisp","-autoexit","-t",$duration,$musicUrl -WindowStyle Hidden -ErrorAction SilentlyContinue } catch {}
+    if (-not $musicUrl) { return $null }
+    try {
+        $p = [System.Diagnostics.Process]::Start("ffplay", "-nodisp","-autoexit","-t","$duration","`"$musicUrl`"")
+        return $p
+    } catch { return $null }
+}
+function Stop-Music($proc) {
+    if (-not $proc -or $proc.HasExited) { return }
+    try { $proc.Kill(); $proc.WaitForExit(2000) } catch {}
 }
 function Play-Sound {
     try {
-        Start-Process ffplay -ArgumentList "-nodisp","-autoexit","-f","lavfi","-i","sine=frequency=523:duration=0.3,volume=0.15" -WindowStyle Hidden -ErrorAction SilentlyContinue
+        $p = [System.Diagnostics.Process]::Start("ffplay", "-nodisp","-autoexit","-f","lavfi","-i","sine=frequency=523:duration=0.3,volume=0.15")
+        if ($p) { Start-Sleep -Milliseconds 500; if (-not $p.HasExited) { $p.Kill() } }
     } catch {}
 }
 
@@ -176,8 +184,9 @@ while ($true) {
         if ((Get-Date) -ge $nextActive) {
             Write-Host "[$((Get-Date).ToString('HH:mm'))] 🏃 Pausa activa"
             if ($sound) { Play-Sound }
-            Play-Music $activeDurationSec
+            $_mp = Play-Music $activeDurationSec
             Launch-Break "activo" $activeDurationSec
+            Stop-Music $_mp
             Show-Stats
             $nextActive = (Get-Date).AddSeconds($ai); $nextVisual = (Get-Date).AddSeconds($ai)
         }
@@ -185,8 +194,9 @@ while ($true) {
         if ((Get-Date) -ge $nextVisual) {
             Write-Host "[$((Get-Date).ToString('HH:mm'))] 👀 Descanso visual"
             if ($sound) { Play-Sound }
-            Play-Music $visualDurationSec
+            $_mp = Play-Music $visualDurationSec
             Launch-Break "visual" $visualDurationSec
+            Stop-Music $_mp
             Show-Stats; $nextVisual = (Get-Date).AddSeconds($vi)
         }
     }
