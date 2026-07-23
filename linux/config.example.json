@@ -3,8 +3,13 @@
   "visual_duration_sec": 30,
   "active_interval_min": 60,
   "active_duration_sec": 180,
+  "water_interval_min": 30,
+  "water_duration_sec": 10,
   "lunch_time": "12:00",
   "sleep_time": "22:30",
   "music_url": "https://streams.fluxfm.de/lofi/mp3-128/",
-  "animal": "perro"
+  "animal": "perro",
+  "theme": "dark",
+  "weather_city": "",
+  "sound": true
 }

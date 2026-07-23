@@ -1,35 +1,96 @@
 #!/usr/bin/env python3
 import json
-import os
 import subprocess
 import sys
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
+import urllib.request
 
 CONFIG_DIR = Path.home() / '.config' / 'descanso-visual'
 CONFIG_FILE = CONFIG_DIR / 'config.json'
+STATS_FILE = CONFIG_DIR / 'stats.json'
+SNOOZE_FILE = CONFIG_DIR / 'snooze_until'
+WEATHER_CACHE = CONFIG_DIR / 'weather_cache'
 
 DEFAULT_CONFIG = {
     "visual_interval_min": 20,
     "visual_duration_sec": 30,
     "active_interval_min": 60,
     "active_duration_sec": 180,
+    "water_interval_min": 30,
+    "water_duration_sec": 10,
     "lunch_time": "12:00",
     "sleep_time": "22:30",
     "music_url": "https://streams.fluxfm.de/lofi/mp3-128/",
     "animal": "perro",
+    "theme": "dark",
+    "weather_city": "",
+    "sound": True,
 }
 
 def load_config():
     if CONFIG_FILE.exists():
-        with open(CONFIG_FILE) as f:
-            cfg = json.load(f)
-        return {**DEFAULT_CONFIG, **cfg}
+        try:
+            with open(CONFIG_FILE) as f:
+                cfg = json.load(f)
+            return {**DEFAULT_CONFIG, **cfg}
+        except Exception:
+            pass
     CONFIG_DIR.mkdir(parents=True, exist_ok=True)
     with open(CONFIG_FILE, 'w') as f:
         json.dump(DEFAULT_CONFIG, f, indent=2)
     return dict(DEFAULT_CONFIG)
+
+def load_stats():
+    try:
+        if STATS_FILE.exists():
+            with open(STATS_FILE) as f:
+                return json.load(f)
+    except Exception:
+        pass
+    return {}
+
+def stats_summary(stats):
+    today = datetime.now().date().isoformat()
+    parts = []
+    for modo, label in [('visual', 'visuales'), ('activo', 'activas'),
+                         ('almuerzo', 'almuerzos'), ('dormir', 'dormir'),
+                         ('agua', 'aguas')]:
+        if modo in stats:
+            s = stats[modo]
+            t = s['today'] if s.get('date') == today else 0
+            tot = s['total']
+            if t > 0 or tot > 0:
+                parts.append(f"{t} {label} (total {tot})")
+    return parts
+
+def weekly_summary(stats):
+    today = datetime.now().date()
+    week_start = today - timedelta(days=today.weekday())
+    totals = {}
+    for i in range(7):
+        day = (week_start + timedelta(days=i)).isoformat()
+        if day in stats.get('history', {}):
+            for modo, count in stats['history'][day].items():
+                totals[modo] = totals.get(modo, 0) + count
+    parts = []
+    labels = {'visual': 'visuales', 'activo': 'activas', 'agua': 'aguas',
+              'almuerzo': 'almuerzos', 'dormir': 'dormir'}
+    for modo, count in sorted(totals.items(), key=lambda x: -x[1]):
+        if modo in labels and count > 0:
+            parts.append(f"{count} {labels[modo]}")
+    return parts
+
+def play_sound():
+    try:
+        subprocess.Popen(
+            ['ffplay', '-nodisp', '-autoexit', '-f', 'lavfi', '-i',
+             'sine=frequency=523:duration=0.3,volume=0.15'],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+        )
+    except FileNotFoundError:
+        pass
 
 def play_music(url, duration):
     if not url:
@@ -44,10 +105,47 @@ def play_music(url, duration):
         except FileNotFoundError:
             continue
 
-def launch_break(mode, duration, animal):
-    script = str(Path.home() / '.local' / 'bin' / 'pantalla-descanso')
+def fetch_weather(city=""):
     try:
-        subprocess.run([sys.executable, script, str(duration), mode, animal])
+        url = f"https://wttr.in/{city}?format=%t+%C&lang=es"
+        req = urllib.request.Request(url, headers={'User-Agent': 'curl/7.0'})
+        resp = urllib.request.urlopen(req, timeout=5)
+        return resp.read().decode().strip()
+    except Exception:
+        return None
+
+def get_weather(city=""):
+    try:
+        if WEATHER_CACHE.exists():
+            data = json.loads(WEATHER_CACHE.read_text())
+            if time.time() - data.get('time', 0) < 1800:
+                return data.get('text')
+    except Exception:
+        pass
+    text = fetch_weather(city)
+    if text:
+        CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+        WEATHER_CACHE.write_text(json.dumps({'text': text, 'time': time.time()}))
+    return text
+
+def is_snoozed():
+    try:
+        if SNOOZE_FILE.exists():
+            snooze_until = float(SNOOZE_FILE.read_text().strip())
+            if time.time() < snooze_until:
+                return True
+            SNOOZE_FILE.unlink(missing_ok=True)
+    except Exception:
+        pass
+    return False
+
+def launch_break(mode, duration, animal, weather):
+    script = str(Path.home() / '.local' / 'bin' / 'pantalla-descanso')
+    args = [sys.executable, script, str(duration), mode, animal]
+    if weather:
+        args.append(weather)
+    try:
+        subprocess.run(args)
     except Exception as e:
         print(f"Error: {mode} -> {e}")
 
@@ -55,101 +153,120 @@ def parse_time(t_str, day):
     h, m = t_str.split(':')
     return datetime(day.year, day.month, day.day, int(h), int(m))
 
-STATS_FILE = CONFIG_DIR / 'stats.json'
-
-def load_stats():
-    try:
-        if STATS_FILE.exists():
-            with open(STATS_FILE) as f:
-                return json.load(f)
-    except Exception:
-        pass
-    return {}
-
-def stats_summary(stats):
-    from datetime import date
-    today = date.today().isoformat()
-    parts = []
-    for modo, label in [('visual', 'visuales'), ('activo', 'activas'),
-                         ('almuerzo', 'almuerzos'), ('dormir', 'dormir')]:
-        if modo in stats:
-            s = stats[modo]
-            t = s['today'] if s.get('date') == today else 0
-            tot = s['total']
-            if t > 0 or tot > 0:
-                parts.append(f"{t} {label} (total {tot})")
-    return parts
-
 def main():
     config = load_config()
     vi = config['visual_interval_min'] * 60
     ai = config['active_interval_min'] * 60
+    wi = config['water_interval_min'] * 60
+    use_sound = config.get('sound', True)
 
     next_visual = time.time()
     next_active = time.time() + ai
+    next_water = time.time() + wi
     last_lunch_date = None
     last_sleep_date = None
 
     animal = config['animal']
     music = config['music_url']
-    stats = load_stats()
+    weather_city = config.get('weather_city', '')
+
+    weather = get_weather(weather_city) if weather_city else None
 
     print("── Descanso Visual ──")
     print(f"  Visual:   cada {config['visual_interval_min']} min  ({config['visual_duration_sec']}s)")
     print(f"  Activo:   cada {config['active_interval_min']} min  ({config['active_duration_sec']}s)")
+    print(f"  Agua:     cada {config['water_interval_min']} min  ({config['water_duration_sec']}s)")
     print(f"  Almuerzo: {config['lunch_time']}")
     print(f"  Dormir:   {config['sleep_time']}")
     print(f"  Animal:   {animal}")
+    print(f"  Tema:     {config.get('theme', 'dark')}")
     print(f"  Música:   {'sí' if music else 'no'}")
+    print(f"  Sonido:   {'sí' if use_sound else 'no'}")
+    if weather:
+        print(f"  Clima:    {weather}")
+    stats = load_stats()
     parts = stats_summary(stats)
     if parts:
         print("── Estadísticas ────")
         for p in parts:
             print(f"  {p}")
+    wparts = weekly_summary(stats)
+    if wparts:
+        print(f"  Semana: {'  ·  '.join(wparts)}")
     print("────────────────────")
 
     while True:
         now = datetime.now()
         hoy = now.date()
 
+        weather = get_weather(weather_city) if weather_city else None
+
         if last_lunch_date != hoy:
             lunch = parse_time(config['lunch_time'], hoy)
             if lunch <= now <= lunch + timedelta(minutes=30):
                 print(f"[{now.strftime('%H:%M')}] ⏰ Almuerzo")
-                launch_break('almuerzo', 0, animal)
+                if use_sound:
+                    play_sound()
+                launch_break('almuerzo', 0, animal, weather)
                 stats = load_stats()
                 for p in stats_summary(stats):
                     print(f"  {p}")
+                wparts = weekly_summary(stats)
+                if wparts:
+                    print(f"  Semana: {'  ·  '.join(wparts)}")
                 last_lunch_date = hoy
 
         if last_sleep_date != hoy:
             sleep_t = parse_time(config['sleep_time'], hoy)
             if sleep_t <= now <= sleep_t + timedelta(minutes=30):
                 print(f"[{now.strftime('%H:%M')}] 🌙 Dormir")
-                launch_break('dormir', 0, animal)
+                if use_sound:
+                    play_sound()
+                launch_break('dormir', 0, animal, weather)
                 stats = load_stats()
                 for p in stats_summary(stats):
                     print(f"  {p}")
+                wparts = weekly_summary(stats)
+                if wparts:
+                    print(f"  Semana: {'  ·  '.join(wparts)}")
                 last_sleep_date = hoy
 
-        if time.time() >= next_active:
-            print(f"[{now.strftime('%H:%M')}] 🏃 Pausa activa")
-            play_music(music, config['active_duration_sec'])
-            launch_break('activo', config['active_duration_sec'], animal)
-            stats = load_stats()
-            for p in stats_summary(stats):
-                print(f"  {p}")
-            next_active = time.time() + ai
-            next_visual = time.time() + ai
+        if not is_snoozed():
+            if time.time() >= next_water:
+                print(f"[{now.strftime('%H:%M')}] 💧 Agua")
+                if use_sound:
+                    play_sound()
+                launch_break('agua', config['water_duration_sec'], animal, weather)
+                stats = load_stats()
+                for p in stats_summary(stats):
+                    print(f"  {p}")
+                next_water = time.time() + wi
 
-        if time.time() >= next_visual:
-            print(f"[{now.strftime('%H:%M')}] 👀 Descanso visual")
-            play_music(music, config['visual_duration_sec'])
-            launch_break('visual', config['visual_duration_sec'], animal)
-            stats = load_stats()
-            for p in stats_summary(stats):
-                print(f"  {p}")
-            next_visual = time.time() + vi
+            if time.time() >= next_active:
+                print(f"[{now.strftime('%H:%M')}] 🏃 Pausa activa")
+                if use_sound:
+                    play_sound()
+                play_music(music, config['active_duration_sec'])
+                launch_break('activo', config['active_duration_sec'], animal, weather)
+                stats = load_stats()
+                for p in stats_summary(stats):
+                    print(f"  {p}")
+                wparts = weekly_summary(stats)
+                if wparts:
+                    print(f"  Semana: {'  ·  '.join(wparts)}")
+                next_active = time.time() + ai
+                next_visual = time.time() + ai
+
+            if time.time() >= next_visual:
+                print(f"[{now.strftime('%H:%M')}] 👀 Descanso visual")
+                if use_sound:
+                    play_sound()
+                play_music(music, config['visual_duration_sec'])
+                launch_break('visual', config['visual_duration_sec'], animal, weather)
+                stats = load_stats()
+                for p in stats_summary(stats):
+                    print(f"  {p}")
+                next_visual = time.time() + vi
 
         time.sleep(5)
 

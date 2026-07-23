@@ -2,26 +2,141 @@
 import gi
 gi.require_version('Gtk', '3.0')
 gi.require_version('GLib', '2.0')
-from gi.repository import Gtk, GLib, Gdk
+from gi.repository import Gtk, GLib, Gdk, Pango
 import random
 import time
 import sys
 import signal
 import json
 from pathlib import Path
-from datetime import date
+from datetime import date, datetime, timedelta
+import urllib.request
 
 SEGUNDOS = int(sys.argv[1]) if len(sys.argv) > 1 else 30
 MODO = (sys.argv[2] if len(sys.argv) > 2 else 'visual').lower()
 ANIMAL = (sys.argv[3] if len(sys.argv) > 3 else 'perro').lower()
+WEATHER = sys.argv[4] if len(sys.argv) > 4 else None
 
 CONFIG_DIR = Path.home() / '.config' / 'descanso-visual'
 STATS_FILE = CONFIG_DIR / 'stats.json'
+CONFIG_FILE = CONFIG_DIR / 'config.json'
+MESSAGES_FILE = CONFIG_DIR / 'messages.json'
+SNOOZE_FILE = CONFIG_DIR / 'snooze_until'
 
 def _center(frames):
     w = max(len(l) for f in frames for l in f)
     return [[l.center(w) for l in f] for f in frames]
 
+def load_config():
+    try:
+        if CONFIG_FILE.exists():
+            with open(CONFIG_FILE) as f:
+                return json.load(f)
+    except Exception:
+        pass
+    return {}
+
+def load_stats():
+    try:
+        if STATS_FILE.exists():
+            with open(STATS_FILE) as f:
+                return json.load(f)
+    except Exception:
+        pass
+    return {}
+
+def save_stats(stats):
+    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    with open(STATS_FILE, 'w') as f:
+        json.dump(stats, f, indent=2)
+
+def increment_stat(modo):
+    stats = load_stats()
+    today = date.today().isoformat()
+    for key in ('visual', 'activo', 'almuerzo', 'dormir', 'agua'):
+        if key not in stats:
+            stats[key] = {'total': 0, 'today': 0, 'date': today}
+    if stats[modo].get('date') != today:
+        stats[modo]['today'] = 0
+    stats[modo]['total'] += 1
+    stats[modo]['today'] += 1
+    stats[modo]['date'] = today
+    if 'history' not in stats:
+        stats['history'] = {}
+    if today not in stats['history']:
+        stats['history'][today] = {}
+    stats['history'][today][modo] = stats['history'][today].get(modo, 0) + 1
+    cutoff = (date.today() - timedelta(days=30)).isoformat()
+    stats['history'] = {k: v for k, v in stats['history'].items() if k >= cutoff}
+    save_stats(stats)
+    return stats
+
+def get_stats_line(stats):
+    today = date.today().isoformat()
+    parts = []
+    labels = {
+        'visual': ('visuales', '👁'),
+        'activo': ('activas', '🏃'),
+        'almuerzo': ('almuerzos', '🍽'),
+        'dormir': ('dormir', '🌙'),
+        'agua': ('aguas', '💧')
+    }
+    for modo, (label, icon) in labels.items():
+        if modo in stats:
+            s = stats[modo]
+            t = s['today'] if s.get('date') == today else 0
+            if t > 0:
+                parts.append(f"{icon} {t} {label}")
+    if not parts:
+        return "Hoy aún no hay pausas registradas"
+    return "  ·  ".join(parts)
+
+def get_weekly_stats(stats):
+    today = date.today()
+    week_start = today - timedelta(days=today.weekday())
+    totals = {}
+    for i in range(7):
+        day = (week_start + timedelta(days=i)).isoformat()
+        if day in stats.get('history', {}):
+            for modo, count in stats['history'][day].items():
+                totals[modo] = totals.get(modo, 0) + count
+    return totals
+
+def get_weekly_line(stats):
+    weekly = get_weekly_stats(stats)
+    if not weekly:
+        return ""
+    parts = []
+    labels = {
+        'visual': ('visuales', '👁'),
+        'activo': ('activas', '🏃'),
+        'almuerzo': ('almuerzos', '🍽'),
+        'dormir': ('dormir', '🌙'),
+        'agua': ('aguas', '💧')
+    }
+    for modo, count in sorted(weekly.items(), key=lambda x: -x[1]):
+        if modo in labels and count > 0:
+            label, icon = labels[modo]
+            parts.append(f"{icon} {count} {label}")
+    if not parts:
+        return ""
+    return "Semana: " + "  ·  ".join(parts)
+
+def write_snooze():
+    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    with open(SNOOZE_FILE, 'w') as f:
+        f.write(str(time.time() + 300))
+
+def load_custom_messages():
+    try:
+        if MESSAGES_FILE.exists():
+            with open(MESSAGES_FILE) as f:
+                return json.load(f)
+    except Exception:
+        pass
+    return {}
+
+# --- Animal frames ---
 _DOG = _center([
     ["     / \\__", "    (    @\\___", "    /          O", "   /    (_____/", "  /_____/    U"],
     ["     / \\__", "    (    @\\___", "    /          O", "   /    (_____/", "  /_____/   ~U"],
@@ -38,7 +153,10 @@ _CAT = _center([
 
 FRAMES = _DOG if ANIMAL not in ('gato', 'cat', 'g') else _CAT
 
-CURIOSIDADES = [
+# --- Messages ---
+custom = load_custom_messages()
+
+_CURIOSIDADES = [
     "Los pulpos tienen tres corazones y su sangre es azul.",
     "Un día en Venus dura más que un año en Venus.",
     "Las hormigas nunca duermen; toman micro-siestas de 8 segundos.",
@@ -63,9 +181,9 @@ CURIOSIDADES = [
     "Los gatos no pueden saborear lo dulce.",
     "Los pingüinos proponen matrimonio con una piedra.",
     "Tu cuerpo reemplaza millones de células cada segundo.",
-]
+] + custom.get('curiosidades', [])
 
-EJERCICIOS = [
+_EJERCICIOS = [
     "Estira los brazos hacia arriba — 15 segundos",
     "Gira los hombros hacia atrás — 10 repeticiones",
     "Inclina la cabeza a la izquierda — 15s cada lado",
@@ -82,18 +200,27 @@ EJERCICIOS = [
     "Estira el cuello hacia adelante — 10 segundos",
     "Haz sentadillas — 5 repeticiones",
     "Separa y junta los dedos — 10 veces",
-]
+] + custom.get('ejercicios', [])
 
-CONSEJOS_SALUD = [
-    "Beber agua ayuda a mantener la concentración.",
-    "Parpadea conscientemente para lubricar tus ojos.",
-    "La postura correcta previene dolores de cuello.",
-    "Respira profundo: inspira 4s, mantén 4s, exhala 4s.",
-    "La luz azul de las pantallas afecta el sueño nocturno.",
-    "Cada hora de escritorio, 5 minutos de movimiento.",
-]
+_MOTIVACIONALES = [
+    "Cada paso cuenta, no importa cuán pequeño.",
+    "El progreso, no la perfección.",
+    "Tu esfuerzo de hoy es tu fuerza de mañana.",
+    "No te rindas, estás más cerca de lo que crees.",
+    "La disciplina es el puente entre metas y logros.",
+    "Un descanso ahora es energía para después.",
+    "Cuida tu cuerpo, es el único lugar que tienes para vivir.",
+    "La constancia vence al talento.",
+    "Hoy es un buen día para ser mejor que ayer.",
+    "Tu salud es tu mayor inversión.",
+    "Respira profundo. Esto también pasará.",
+    "Pequeños hábitos, grandes cambios.",
+    "No cuentes los días, haz que los días cuenten.",
+    "El mejor momento para empezar es ahora.",
+    "Cree en ti mismo y serás imparable.",
+] + custom.get('motivacionales', [])
 
-COMIDAS = [
+_COMIDAS = [
     "Come algo nutritivo y equilibrado.",
     "Tómate mínimo 20 minutos para comer sin prisas.",
     "Aléjate de la pantalla mientras comes.",
@@ -101,9 +228,9 @@ COMIDAS = [
     "Incluye proteínas y verduras en tu plato.",
     "Mastica despacio y disfruta cada bocado.",
     "Evita comer en el escritorio. Tu cuerpo lo agradecerá.",
-]
+] + custom.get('comidas', [])
 
-DORMIR_TIPS = [
+_DORMIR_TIPS = [
     "Apaga todas las pantallas 30 min antes de dormir.",
     "Prepara tu habitación: oscura, fresca y silenciosa.",
     "Lee un libro antes de dormir.",
@@ -111,99 +238,96 @@ DORMIR_TIPS = [
     "Respira profundamente 5 veces: 4-7-8.",
     "Mañana será un gran día. Descansa bien.",
     "Desconecta las notificaciones del teléfono.",
-]
+] + custom.get('dormir', [])
+
+_AGUA_MSGS = [
+    "¡Toma un vaso de agua!",
+    "Hidrátate, tu cuerpo lo necesita.",
+    "Un vaso de agua ahora te dará energía.",
+    "Beber agua mejora tu concentración.",
+    "Tu cerebro es 75% agua. ¡Hidrátalo!",
+] + custom.get('agua', [])
 
 BOWL = [" .-._.-. ", "(  o o  )", " \\ o o / ", "  `---'  "]
 MOON = ["   .-.   ", "  (   )  ", "   `-'   ", "  *   *  ", "   * *   "]
+WATER = ["    .", "   / \\", "  /   \\", " |     |", "  \\   /", "   \\ /", "    `"]
 
-def load_stats():
-    try:
-        if STATS_FILE.exists():
-            with open(STATS_FILE) as f:
-                return json.load(f)
-    except Exception:
-        pass
-    return {'visual': {'total': 0, 'today': 0, 'date': ''},
-            'activo': {'total': 0, 'today': 0, 'date': ''},
-            'almuerzo': {'total': 0, 'today': 0, 'date': ''},
-            'dormir': {'total': 0, 'today': 0, 'date': ''}}
+# --- Themes ---
+def make_theme(modo, theme_name):
+    is_dark = theme_name == 'dark'
+    bg = '#0a0a1a' if is_dark else '#f0f0f5'
+    clock = '#e0e0ff' if is_dark else '#1a1a3a'
+    date_c = '#9090b0' if is_dark else '#6060a0'
+    info = '#b0b0d0' if is_dark else '#505080'
+    ptrack = '#1a1a3a' if is_dark else '#d0d0e0'
 
-def save_stats(stats):
-    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-    with open(STATS_FILE, 'w') as f:
-        json.dump(stats, f, indent=2)
-
-def increment_stat(modo):
-    stats = load_stats()
-    today = date.today().isoformat()
-    if modo not in stats:
-        stats[modo] = {'total': 0, 'today': 0, 'date': today}
-    if stats[modo].get('date') != today:
-        stats[modo]['today'] = 0
-    stats[modo]['total'] += 1
-    stats[modo]['today'] += 1
-    stats[modo]['date'] = today
-    save_stats(stats)
-    return stats
-
-def get_stats_line(stats):
-    today = date.today().isoformat()
-    parts = []
-    labels = {
-        'visual': ('visuales', '👁'),
-        'activo': ('activas', '🏃'),
-        'almuerzo': ('almuerzos', '🍽'),
-        'dormir': ('dormir', '🌙')
+    accents = {
+        'visual': {
+            'animal': '#c0c0e0' if is_dark else '#4040a0',
+            'timer': '#ffcc66' if is_dark else '#cc6600',
+            'title': '#ff7755' if is_dark else '#cc4422',
+            'text': '#d0d0a0' if is_dark else '#303060',
+            'icon': '#9090b0' if is_dark else '#6060a0',
+            'pfill': '#6688ff' if is_dark else '#4466cc',
+            'btn': '#3344aa', 'bord': '#5566cc', 'bhov': '#4455cc',
+        },
+        'activo': {
+            'animal': '#a0e0a0' if is_dark else '#208020',
+            'timer': '#88ff88' if is_dark else '#228822',
+            'title': '#66ff66' if is_dark else '#226622',
+            'text': '#c0e0c0' if is_dark else '#204020',
+            'icon': '#80c080' if is_dark else '#408040',
+            'pfill': '#44aa44' if is_dark else '#228822',
+            'btn': '#2a5a2a', 'bord': '#44aa44', 'bhov': '#3a7a3a',
+        },
+        'almuerzo': {
+            'animal': '#d0b060' if is_dark else '#806020',
+            'timer': '#ffaa44' if is_dark else '#cc6600',
+            'title': '#ff9944' if is_dark else '#cc6600',
+            'text': '#e0c080' if is_dark else '#604020',
+            'icon': '#d0b060' if is_dark else '#806020',
+            'pfill': '#cc8844' if is_dark else '#aa6622',
+            'btn': '#8a5a2a', 'bord': '#cc8844', 'bhov': '#aa6a3a',
+        },
+        'dormir': {
+            'animal': '#8080d0' if is_dark else '#4040a0',
+            'timer': '#8888ff' if is_dark else '#4444cc',
+            'title': '#6666ff' if is_dark else '#4444cc',
+            'text': '#8080d0' if is_dark else '#4040a0',
+            'icon': '#7070c0' if is_dark else '#5050a0',
+            'pfill': '#4444cc' if is_dark else '#3333aa',
+            'btn': '#2222aa', 'bord': '#4444cc', 'bhov': '#3333cc',
+        },
+        'agua': {
+            'animal': '#80c0ff' if is_dark else '#2060a0',
+            'timer': '#66ccff' if is_dark else '#2266aa',
+            'title': '#44aaff' if is_dark else '#2266aa',
+            'text': '#a0d0ff' if is_dark else '#204080',
+            'icon': '#80c0ff' if is_dark else '#2060a0',
+            'pfill': '#4488ff' if is_dark else '#2266cc',
+            'btn': '#2244aa', 'bord': '#4466cc', 'bhov': '#3355cc',
+        },
     }
-    for modo, (label, icon) in labels.items():
-        if modo in stats:
-            s = stats[modo]
-            if s.get('date') == today:
-                t = s['today']
-            else:
-                t = 0
-            if t > 0:
-                parts.append(f"{icon} {t} {label}")
-    if not parts:
-        return "Hoy aún no hay pausas registradas"
-    return "  ·  ".join(parts)
 
-THEMES = {
-    'visual': {
-        'bg': '#0a0a1a', 'clock': '#e0e0ff', 'date': '#9090b0',
-        'animal': '#c0c0e0', 'timer': '#ffcc66', 'info': '#b0b0d0',
-        'title': '#ff7755', 'text': '#d0d0a0', 'icon': '#9090b0',
-        'ptrack': '#1a1a3a', 'pfill': '#6688ff',
-        'btn': '#3344aa', 'bord': '#5566cc', 'bhov': '#4455cc',
-        'title_txt': 'DESCANSO VISUAL',
-    },
-    'activo': {
-        'bg': '#0a1a0a', 'clock': '#c0ffc0', 'date': '#80a080',
-        'animal': '#a0e0a0', 'timer': '#88ff88', 'info': '#b0d0b0',
-        'title': '#66ff66', 'text': '#c0e0c0', 'icon': '#80c080',
-        'ptrack': '#1a3a1a', 'pfill': '#44aa44',
-        'btn': '#2a5a2a', 'bord': '#44aa44', 'bhov': '#3a7a3a',
-        'title_txt': 'PAUSA ACTIVA',
-    },
-    'almuerzo': {
-        'bg': '#1a140a', 'clock': '#ffd080', 'date': '#b09070',
-        'animal': '#d0b060', 'timer': '#ffaa44', 'info': '#b09870',
-        'title': '#ff9944', 'text': '#e0c080', 'icon': '#d0b060',
-        'ptrack': '#3a2a1a', 'pfill': '#cc8844',
-        'btn': '#8a5a2a', 'bord': '#cc8844', 'bhov': '#aa6a3a',
-        'title_txt': 'HORA DE ALMORZAR',
-    },
-    'dormir': {
-        'bg': '#080820', 'clock': '#9090ff', 'date': '#6060a0',
-        'animal': '#8080d0', 'timer': '#8888ff', 'info': '#6060a0',
-        'title': '#6666ff', 'text': '#8080d0', 'icon': '#7070c0',
-        'ptrack': '#181838', 'pfill': '#4444cc',
-        'btn': '#2222aa', 'bord': '#4444cc', 'bhov': '#3333cc',
-        'title_txt': 'HORA DE DORMIR',
-    },
-}
+    titles = {
+        'visual': 'DESCANSO VISUAL', 'activo': 'PAUSA ACTIVA',
+        'almuerzo': 'HORA DE ALMORZAR', 'dormir': 'HORA DE DORMIR',
+        'agua': 'HIDRATACIÓN',
+    }
 
-T = THEMES.get(MODO, THEMES['visual'])
+    t = {'bg': bg, 'clock': clock, 'date': date_c, 'info': info, 'ptrack': ptrack}
+    t.update(accents.get(modo, accents['visual']))
+    t['title_txt'] = titles.get(modo, 'DESCANSO')
+    return t
+
+config = load_config()
+theme_pref = config.get('theme', 'dark')
+if theme_pref == 'auto':
+    hour = datetime.now().hour
+    theme_name = 'light' if 7 <= hour < 19 else 'dark'
+else:
+    theme_name = theme_pref
+T = make_theme(MODO, theme_name)
 TIENE_TEMPORIZADOR = MODO in ('visual', 'activo')
 
 
@@ -234,10 +358,13 @@ class PantallaDescanso(Gtk.Window):
         #date  {{ font-size: 16px; color: {T['date']}; margin-top: 4px; }}
         #animal-label {{ font-size: 18px; font-family: monospace; color: {T['animal']}; margin-top: 20px; }}
         #timer-text {{ font-size: 22px; color: {T['timer']}; margin-top: 16px; }}
-        #info-text {{ font-size: 16px; color: {T['info']}; font-style: italic; margin-top: 20px;
+        #info-text {{ font-size: 16px; color: {T['info']}; font-style: italic; margin-top: 16px;
                       padding-left: 40px; padding-right: 40px; }}
-        #stats-text {{ font-size: 14px; color: {T['date']}; margin-top: 16px;
+        #stats-text {{ font-size: 13px; color: {T['date']}; margin-top: 12px;
                        padding-left: 40px; padding-right: 40px; }}
+        #weekly-text {{ font-size: 12px; color: {T['date']}; margin-top: 4px;
+                        padding-left: 40px; padding-right: 40px; }}
+        #weather-text {{ font-size: 14px; color: {T['date']}; margin-top: 4px; }}
         #mode-title {{ font-size: 36px; font-weight: bold; color: {T['title']}; margin-top: 20px; }}
         #mode-text {{ font-size: 20px; color: {T['text']}; margin-top: 12px;
                       padding-left: 40px; padding-right: 40px; }}
@@ -246,8 +373,9 @@ class PantallaDescanso(Gtk.Window):
         #progress progress {{ min-height: 10px; border-radius: 5px; background: {T['pfill']}; }}
         #close-btn {{ font-size: 16px; padding: 12px 40px; background: {T['btn']};
                        color: white; border: 2px solid {T['bord']}; border-radius: 8px;
-                       margin-top: 20px; font-weight: bold; }}
+                       margin-top: 16px; font-weight: bold; }}
         #close-btn:hover {{ background: {T['bhov']}; }}
+        #hint {{ font-size: 11px; color: {T['date']}; margin-top: 8px; }}
         """
         provider = Gtk.CssProvider()
         provider.load_from_data(css.encode())
@@ -265,6 +393,10 @@ class PantallaDescanso(Gtk.Window):
         self.label_date = Gtk.Label(name="date")
         vbox.pack_start(self.label_date, False, False, 0)
 
+        if WEATHER:
+            label_weather = Gtk.Label(name="weather-text", label=WEATHER)
+            vbox.pack_start(label_weather, False, False, 0)
+
         if MODO in ('visual', 'activo'):
             self.label_animal = Gtk.Label(name="animal-label")
             self.label_animal.set_use_markup(False)
@@ -279,13 +411,21 @@ class PantallaDescanso(Gtk.Window):
             self.progress.set_margin_bottom(8)
             vbox.pack_start(self.progress, False, False, 0)
 
-            items = CURIOSIDADES if MODO == 'visual' else EJERCICIOS
-            label_info = Gtk.Label(name="info-text", label=random.choice(items))
+            if MODO == 'visual':
+                pool = _CURIOSIDADES + _MOTIVACIONALES
+            else:
+                pool = _EJERCICIOS + _MOTIVACIONALES
+            label_info = Gtk.Label(name="info-text", label=random.choice(pool))
             label_info.set_line_wrap(True)
             label_info.set_max_width_chars(50)
             vbox.pack_start(label_info, False, False, 0)
         else:
-            icon = (BOWL if MODO == 'almuerzo' else MOON)
+            if MODO == 'almuerzo':
+                icon = BOWL
+            elif MODO == 'dormir':
+                icon = MOON
+            else:
+                icon = WATER
             icon_text = '\n'.join(l.center(max(len(r) for r in icon)) for l in icon)
             label_icon = Gtk.Label(name="mode-icon", label=icon_text)
             vbox.pack_start(label_icon, False, False, 0)
@@ -293,27 +433,51 @@ class PantallaDescanso(Gtk.Window):
             label_title = Gtk.Label(name="mode-title", label=T['title_txt'])
             vbox.pack_start(label_title, False, False, 0)
 
-            items = COMIDAS if MODO == 'almuerzo' else DORMIR_TIPS
-            label_text = Gtk.Label(name="mode-text", label=random.choice(items))
+            if MODO == 'almuerzo':
+                pool = _COMIDAS
+            elif MODO == 'dormir':
+                pool = _DORMIR_TIPS
+            else:
+                pool = _AGUA_MSGS
+            label_text = Gtk.Label(name="mode-text", label=random.choice(pool))
             label_text.set_line_wrap(True)
             label_text.set_max_width_chars(45)
             vbox.pack_start(label_text, False, False, 0)
 
-            label_foot = Gtk.Label(name="info-text",
-                label="Tómate tu tiempo, la pantalla seguirá aquí.")
-            label_foot.set_margin_top(16)
+            if MODO == 'agua':
+                label_foot = Gtk.Label(name="info-text",
+                    label="Bebe despacio, disfruta cada sorbo.")
+            else:
+                label_foot = Gtk.Label(name="info-text",
+                    label="Tómate tu tiempo, la pantalla seguirá aquí.")
+            label_foot.set_margin_top(12)
             vbox.pack_start(label_foot, False, False, 0)
 
         stats_line = get_stats_line(self.stats)
         self.label_stats = Gtk.Label(name="stats-text", label=stats_line)
-        self.label_stats.set_margin_top(16)
         vbox.pack_start(self.label_stats, False, False, 0)
+
+        weekly_line = get_weekly_line(self.stats)
+        if weekly_line:
+            self.label_weekly = Gtk.Label(name="weekly-text", label=weekly_line)
+            vbox.pack_start(self.label_weekly, False, False, 0)
+
+        if not TIENE_TEMPORIZADOR:
+            auto_sec = 10 if MODO == 'agua' else 600
+            GLib.timeout_add_seconds(auto_sec, Gtk.main_quit)
 
         btn_label = "Cerrar" if not TIENE_TEMPORIZADOR else "Desbloquear"
         self.btn_close = Gtk.Button(label=btn_label, name="close-btn")
         self.btn_close.set_visible(not TIENE_TEMPORIZADOR)
         self.btn_close.connect("clicked", self.on_close)
         vbox.pack_start(self.btn_close, False, False, 0)
+
+        label_hint = Gtk.Label(name="hint")
+        if TIENE_TEMPORIZADOR:
+            label_hint.set_text("Espacio: saltar  ·  Z: snooze 5 min")
+        else:
+            label_hint.set_text("Espacio o Z: cerrar  ·  Z también pospone la próxima pausa 5 min")
+        vbox.pack_start(label_hint, False, False, 0)
 
         self.actualizar_reloj()
         if MODO in ('visual', 'activo'):
@@ -323,8 +487,6 @@ class PantallaDescanso(Gtk.Window):
         if MODO in ('visual', 'activo'):
             GLib.timeout_add(400, self.animar_animal)
             GLib.timeout_add(100, self.actualizar_timer)
-        else:
-            GLib.timeout_add_seconds(600, Gtk.main_quit)
 
         self.connect("key-press-event", self.on_key)
         self.connect("destroy", Gtk.main_quit)
@@ -362,16 +524,35 @@ class PantallaDescanso(Gtk.Window):
             self.stats_updated = True
         Gtk.main_quit()
 
+    def do_snooze(self):
+        write_snooze()
+        if not self.stats_updated:
+            self.stats = increment_stat(MODO)
+            self.stats_updated = True
+        Gtk.main_quit()
+
+    def do_skip(self):
+        if not self.stats_updated:
+            self.stats = increment_stat(MODO)
+            self.stats_updated = True
+        Gtk.main_quit()
+
     def on_key(self, _widget, event):
-        if event.keyval == Gdk.KEY_Escape:
+        keyval = event.keyval
+        if keyval == Gdk.KEY_space:
+            self.do_skip()
+            return True
+        if keyval in (Gdk.KEY_z, Gdk.KEY_Z):
+            self.do_snooze()
+            return True
+        if keyval == Gdk.KEY_Escape:
             if not TIENE_TEMPORIZADOR or self.tiempo_restante <= 0:
-                if not self.stats_updated and (not TIENE_TEMPORIZADOR or self.tiempo_restante <= 0):
-                    self.stats = increment_stat(MODO)
-                    self.stats_updated = True
-                Gtk.main_quit()
-        if event.keyval in (Gdk.KEY_Return, Gdk.KEY_KP_Enter):
+                self.do_skip()
+            return True
+        if keyval in (Gdk.KEY_Return, Gdk.KEY_KP_Enter):
             if self.btn_close.get_visible():
                 self.on_close(None)
+            return True
         return True
 
 
