@@ -126,21 +126,42 @@ def load_custom_messages():
 
 custom = load_custom_messages()
 
-_DOG = _center([
-    ["     / \\__", "    (    @\\___", "    /          O", "   /    (_____/", "  /_____/    U"],
-    ["     / \\__", "    (    @\\___", "    /          O", "   /    (_____/", "  /_____/   ~U"],
-    ["     / \\__", "    (    @\\___", "    /          O", "   /    (_____/", "  /_____/    U"],
-    ["     / \\__", "    (    @\\___", "    /          O", "   /    (_____/", " ~\\_____/    U"],
-])
+_DOG = [
+    "     / \\__\n    (    @\\___\n    /          O\n   /    (_____/\n  /_____/    U    ",
+    "     / \\__\n    (    @\\___\n    /          O\n   /    (_____/\n  /_____/   ~U   ",
+    "     / \\__\n    (    @\\___\n    /          O\n   /    (_____/\n  /_____/  ~~U   ",
+    "     / \\__\n    (    @\\___\n    /          O\n   /    (_____/\n  /_____/ ~~~U   ",
+    "     / \\__\n    (    @\\___\n    /          O\n   /    (_____/\n  /_____/  ~~U   ",
+    "     / \\__\n    (    @\\___\n    /          O\n   /    (_____/\n  /_____/   ~U   ",
+    "     / \\__\n    (    @\\___\n    /          O\n   /    (_____/\n  /_____/    U    ",
+    "      / \\__\n     (    @\\___\n     /          O\n    /    (_____/\n   /_____/    U   ",
+]
 
-_CAT = _center([
-    ["   |\\      _,,,---,,_", "   /,`.-'`'    -.  ;-;;,_", "  |,4-  ) )-,_..;\\ (  `'-'", " '---''(_/--'  `-'\\_)"],
-    ["   |\\      _,,,---,,_", "   /,`.-'`'    -.  ;-;;,_", "  |,-  ) )-,_..;\\ (  `'-'", " '---''(_/--'  `-'\\_)"],
-    ["   |\\      _,,,---,,_", "   /,`.-'`'    -.  ;-;;,_", "  |,4-  ) )-,_..;\\ (  `'-'", " '---''(_/--'  `-'\\_)"],
-    ["   |\\      _,,,---,,_", "   /,`.-'`'    -.  ;-;;,_", "  |,w-  ) )-,_..;\\ (  `'-'", " '---''(_/--'  `-'\\_)"],
-])
+_CAT = [
+    "   |\\      _,,,---,,_\n   /,`.-'`'    -.  ;-;;,_\n  |,4-  ) )-,_..;\\ (  `'-' \n '---''(_/--'  `-'\\_)     ",
+    "   |\\      _,,,---,,_\n   /,`.-'`'    -.  ;-;;,_\n  |,-  ) )-,_..;\\ (  `'-' \n '---''(_/--'  `-'\\~)    ",
+    "   |\\      _,,,---,,_\n   /,`.-'`'    -.  ;-;;,_\n  |,^  ) )-,_..;\\ (  `'-' \n '---''(_/--'  `-'\\~)    ",
+    "   |\\      _,,,---,,_\n   /,`.-'`'    -.  ;-;;,_\n  |,-  ) )-,_..;\\ (  `'-' \n '---''(_/--'  `-'\\~)    ",
+    "   |\\      _,,,---,,_\n   /,`.-'`'    -.  ;-;;,_\n  |,4-  ) )-,_..;\\ (  `'-' \n '---''(_/--'  `-'\\_)     ",
+    "   |\\      _,,,---,,_\n   /,`.-'`'    -.  ;-;;,_\n  |,4-  ) )-,_..;\\ (  `'-' \n  ---''(_/--'  `-'\\_)    ",
+    "   |\\      _,,,---,,_\n   /,`.-'`'    -.  ;-;;,_\n  |,4-  ) )-,_..;\\ (  `'-' \n   --''(_/--'  `-'\\_)    ",
+    "   |\\      _,,,---,,_\n   /,`.-'`'    -.  ;-;;,_\n  |,4-  ) )-,_..;\\ (  `'-' \n  ---''(_/--'  `-'\\_)    ",
+]
 
 FRAMES = _DOG if ANIMAL not in ('gato', 'cat', 'g') else _CAT
+
+def _normalize_frames(frames):
+    parts = [f.split('\n') for f in frames]
+    max_lines = max(len(p) for p in parts)
+    max_w = max(len(l) for p in parts for l in p)
+    result = []
+    for p in parts:
+        pad_top = max_lines - len(p)
+        padded = [' ' * max_w] * pad_top + [l.ljust(max_w) for l in p]
+        result.append('\n'.join(padded))
+    return result
+
+FRAMES = _normalize_frames(FRAMES)
 
 _CURIOSIDADES = [
     "Los pulpos tienen tres corazones y su sangre es azul.",
@@ -328,7 +349,7 @@ class PantallaDescanso:
         self.root.after(100, self._tick)
         self.root.after(200, self._grab_focus)
         if TIENE_TIMER:
-            self.root.after(400, self._animar)
+            self.root.after(500, self._animar)
             self.root.after(100, self._timer_tick)
 
     def _build_ui(self):
@@ -353,9 +374,14 @@ class PantallaDescanso:
             y = 1
 
         if TIENE_TIMER:
-            self.label_animal = tk.Label(f, bg=T['bg'], fg=T['animal'],
-                font=(MONO, 16), justify='center')
-            self.label_animal.pack(pady=(20, 0))
+            sample = FRAMES[0].split('\n')
+            fw = max(len(l) for l in sample)
+            fh = len(sample)
+            self.canvas_animal = tk.Canvas(f, bg=T['bg'], highlightthickness=0,
+                width=fw * 10, height=fh * 18)
+            self.canvas_animal.pack(pady=(20,0))
+            self.animal_font = tk.font.Font(family=MONO, size=14)
+            self._render_animal_frame(0)
 
             self.label_timer = tk.Label(f, bg=T['bg'], fg=T['timer'],
                 font=(SANS, 22))
@@ -446,10 +472,21 @@ class PantallaDescanso:
         self.label_date.config(text=time.strftime("%A, %d de %B de %Y", ahora).capitalize())
         self.root.after(1000, self._tick)
 
+    def _render_animal_frame(self, idx):
+        self.canvas_animal.delete("all")
+        lines = FRAMES[idx].split('\n')
+        fh = 18
+        for i, line in enumerate(lines):
+            self.canvas_animal.create_text(
+                self.canvas_animal.winfo_reqwidth() // 2, i * fh + 2,
+                text=line, font=self.animal_font, fill=T['animal'],
+                anchor='n', justify='center')
+
     def _animar(self):
-        self.frame_idx = (self.frame_idx + 1) % len(FRAMES)
-        self.label_animal.config(text='\n'.join(FRAMES[self.frame_idx]))
-        self.root.after(400, self._animar)
+        n = len(FRAMES)
+        self.frame_idx = (self.frame_idx + 1) % n
+        self._render_animal_frame(self.frame_idx)
+        self.root.after(500, self._animar)
 
     def _timer_tick(self):
         transcurrido = time.monotonic() - self.inicio
