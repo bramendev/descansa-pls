@@ -13,6 +13,9 @@ object Reminder {
     const val CHANNEL = "descanso"
     private const val REQ = 1001
 
+    private fun prefs(ctx: Context) =
+        ctx.getSharedPreferences("descanso", Context.MODE_PRIVATE)
+
     fun schedule(ctx: Context) {
         val am = ctx.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         val at = System.currentTimeMillis() + INTERVAL_MIN * 60_000L
@@ -22,6 +25,24 @@ object Reminder {
         )
         // Exacto y atraviesa Doze. No es repetitivo: cada disparo se re-agenda.
         am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pi)
+        prefs(ctx).edit().putLong("nextAt", at).apply()
+    }
+
+    /** Momento (epoch ms) del próximo descanso; 0 si no hay. */
+    fun nextAt(ctx: Context) = prefs(ctx).getLong("nextAt", 0)
+
+    /** Suma un descanso al contador de hoy (reinicia al cambiar de día). */
+    fun countBreak(ctx: Context) {
+        val p = prefs(ctx)
+        val today = java.time.LocalDate.now().toString()
+        val n = if (p.getString("day", "") == today) p.getInt("count", 0) + 1 else 1
+        p.edit().putString("day", today).putInt("count", n).apply()
+    }
+
+    fun todayCount(ctx: Context): Int {
+        val p = prefs(ctx)
+        return if (p.getString("day", "") == java.time.LocalDate.now().toString())
+            p.getInt("count", 0) else 0
     }
 
     fun ensurePermissions(act: Activity) {
@@ -59,6 +80,7 @@ class BreakReceiver : BroadcastReceiver() {
             .setAutoCancel(true)
             .build()
         nm.notify(1, n)
+        Reminder.countBreak(ctx)
         Reminder.schedule(ctx) // agenda el siguiente
     }
 }
