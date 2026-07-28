@@ -10,6 +10,7 @@ import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
+import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -31,8 +32,9 @@ class MainActivity : Activity() {
     override fun onCreate(s: Bundle?) {
         super.onCreate(s)
         Reminder.ensurePermissions(this)
-        // No reinicia el temporizador si ya hay uno en curso.
-        if (Reminder.nextAt(this) < System.currentTimeMillis()) Reminder.schedule(this)
+        val paused = Reminder.isPaused(this)
+        // No reinicia el temporizador si ya hay uno en curso, ni reactiva si está en pausa.
+        if (!paused && Reminder.nextAt(this) < System.currentTimeMillis()) Reminder.schedule(this)
 
         val col = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -45,8 +47,11 @@ class MainActivity : Activity() {
         col.addView(text("Cuida tus ojos · muévete · hidrátate", 14, muted, Gravity.CENTER))
         col.addView(space(dp(28)))
 
-        col.addView(card("● Activo", green,
-            body("Te avisaré automáticamente,\naunque cierres la app.", 15, muted)))
+        col.addView(card(
+            if (paused) "⏸ Pausado" else "● Activo",
+            if (paused) muted else green,
+            body(if (paused) "Los recordatorios están en pausa."
+                 else "Te avisaré automáticamente,\naunque cierres la app.", 15, muted)))
         col.addView(space(dp(14)))
 
         countdown = body("—", 30, primary, bold = true)
@@ -59,16 +64,24 @@ class MainActivity : Activity() {
 
         col.addView(card("FRECUENCIA", accent,
             body("Cada ${Reminder.INTERVAL_MIN} minutos", 18, primary)))
+        col.addView(space(dp(28)))
+
+        col.addView(pill(if (paused) "Reanudar" else "Pausar recordatorios") {
+            if (Reminder.isPaused(this)) Reminder.schedule(this) else Reminder.pause(this)
+            recreate()
+        })
 
         setContentView(ScrollView(this).apply { setBackgroundColor(bg); addView(col) })
         tick()
     }
 
     private fun tick() {
-        val ms = Reminder.nextAt(this) - System.currentTimeMillis()
-        countdown.text = if (ms <= 0) "pronto" else {
-            val sec = ms / 1000
-            "%d:%02d".format(sec / 60, sec % 60)
+        val next = Reminder.nextAt(this)
+        val ms = next - System.currentTimeMillis()
+        countdown.text = when {
+            Reminder.isPaused(this) || next == 0L -> "—"
+            ms <= 0 -> "pronto"
+            else -> "%d:%02d".format(ms / 1000 / 60, ms / 1000 % 60)
         }
         h.postDelayed(::tick, 1000)
     }
@@ -110,5 +123,20 @@ class MainActivity : Activity() {
 
     private fun space(px: Int) = View(this).apply {
         layoutParams = LinearLayout.LayoutParams(MATCH_PARENT, px)
+    }
+
+    private fun pill(label: String, onClick: () -> Unit) = Button(this).apply {
+        text = label
+        setTextColor(primary)
+        textSize = 16f
+        isAllCaps = false
+        background = GradientDrawable().apply {
+            cornerRadius = dp(24).toFloat()
+            setColor(cardBg)
+            setStroke(dp(1), accent)
+        }
+        setPadding(dp(24), dp(14), dp(24), dp(14))
+        layoutParams = LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT)
+        setOnClickListener { onClick() }
     }
 }

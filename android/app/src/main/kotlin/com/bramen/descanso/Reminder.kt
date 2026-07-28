@@ -16,17 +16,26 @@ object Reminder {
     private fun prefs(ctx: Context) =
         ctx.getSharedPreferences("descanso", Context.MODE_PRIVATE)
 
-    fun schedule(ctx: Context) {
+    private fun pi(ctx: Context) = PendingIntent.getBroadcast(
+        ctx, REQ, Intent(ctx, BreakReceiver::class.java),
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+    )
+
+    fun schedule(ctx: Context, minutes: Int = INTERVAL_MIN) {
         val am = ctx.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        val at = System.currentTimeMillis() + INTERVAL_MIN * 60_000L
-        val pi = PendingIntent.getBroadcast(
-            ctx, REQ, Intent(ctx, BreakReceiver::class.java),
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
+        val at = System.currentTimeMillis() + minutes * 60_000L
         // Exacto y atraviesa Doze. No es repetitivo: cada disparo se re-agenda.
-        am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pi)
-        prefs(ctx).edit().putLong("nextAt", at).apply()
+        am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pi(ctx))
+        prefs(ctx).edit().putLong("nextAt", at).putBoolean("paused", false).apply()
     }
+
+    /** Cancela la alarma pendiente y marca en pausa. */
+    fun pause(ctx: Context) {
+        (ctx.getSystemService(Context.ALARM_SERVICE) as AlarmManager).cancel(pi(ctx))
+        prefs(ctx).edit().putBoolean("paused", true).putLong("nextAt", 0).apply()
+    }
+
+    fun isPaused(ctx: Context) = prefs(ctx).getBoolean("paused", false)
 
     /** Momento (epoch ms) del próximo descanso; 0 si no hay. */
     fun nextAt(ctx: Context) = prefs(ctx).getLong("nextAt", 0)
@@ -86,5 +95,7 @@ class BreakReceiver : BroadcastReceiver() {
 }
 
 class BootReceiver : BroadcastReceiver() {
-    override fun onReceive(ctx: Context, i: Intent) = Reminder.schedule(ctx)
+    override fun onReceive(ctx: Context, i: Intent) {
+        if (!Reminder.isPaused(ctx)) Reminder.schedule(ctx) // no reactivar si estaba en pausa
+    }
 }
