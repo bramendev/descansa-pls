@@ -9,6 +9,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write   # crear el Release y adjuntar el APK
     steps:
       - uses: actions/checkout@v4
 
