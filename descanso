@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-import functools
 import json
 import os
 import subprocess
@@ -218,7 +217,6 @@ def is_snoozed():
         pass
     return False
 
-@functools.lru_cache(maxsize=None)
 def find_pantalla():
     script_dir = Path(__file__).resolve().parent
     candidates = [
@@ -345,7 +343,7 @@ def main():
                 trigger_break('activo', config['active_duration_sec'], animal, weather, use_sound,
                                music_url=music, show_weekly=True)
                 next_active = time.time() + ai
-                next_visual = time.time() + ai
+                next_visual = time.time() + vi
 
             if time.time() >= next_visual:
                 print(f"[{now.strftime('%H:%M')}] {S['mode_visual']}")

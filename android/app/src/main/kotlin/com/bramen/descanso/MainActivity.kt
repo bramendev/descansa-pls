@@ -72,8 +72,12 @@ class MainActivity : Activity() {
         })
 
         setContentView(ScrollView(this).apply { setBackgroundColor(bg); addView(col) })
-        tick()
     }
+
+    // La cuenta regresiva solo corre con la app en pantalla: fuera de ella el
+    // Handler seguiría despertando cada segundo sin que nadie lo vea.
+    override fun onResume() { super.onResume(); tick() }
+    override fun onPause() { super.onPause(); h.removeCallbacksAndMessages(null) }
 
     private fun tick() {
         val next = Reminder.nextAt(this)
@@ -84,11 +88,6 @@ class MainActivity : Activity() {
             else -> "%d:%02d".format(ms / 1000 / 60, ms / 1000 % 60)
         }
         h.postDelayed(::tick, 1000)
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        h.removeCallbacksAndMessages(null)
     }
 
     // --- helpers de UI (sin XML ni dependencias) ---
