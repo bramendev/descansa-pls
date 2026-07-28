@@ -1,10 +1,29 @@
 # Descanso Visual
 
-Recordatorio automático de pausas con pantalla simulada de bloqueo.
-Un solo script en **Python + tkinter**, funciona igual en cualquier sistema
-operativo — solo necesitas Python instalado.
+Recordatorios automáticos de pausas para cuidar tus ojos, moverte e hidratarte.
+Dos versiones que comparten la misma idea:
 
-## Características
+- **Escritorio** — un solo script en **Python + tkinter**, corre igual en
+  Linux, macOS y Windows. Bloquea la pantalla con una pausa animada.
+- **Android** — app nativa en **Kotlin** que te avisa con una notificación
+  full-screen, aunque la app esté cerrada o el teléfono bloqueado.
+
+| | Escritorio | Android |
+|---|---|---|
+| Recordatorios | visual, activo, agua, almuerzo, dormir | cada 20 min |
+| Pantalla de pausa | bloqueo con ASCII art animado | full-screen con cuenta regresiva |
+| Posponer / saltar | Z (snooze 5 min) / Espacio | botones en pantalla |
+| Pausar recordatorios | — | botón Pausar / Reanudar |
+| Sobrevive reinicio | systemd / inicio de sesión | sí (arranca tras reboot) |
+| Idioma | ES / EN automático | ES |
+
+---
+
+## Escritorio (Python)
+
+Un solo script — corre directo desde la carpeta clonada, sin compilar nada.
+
+### Características
 
 - **5 modos**: visual (20 min), activo (60 min), agua (30 min), almuerzo (12:00), dormir (22:30)
 - **ASCII art animado**: perro o gato con animaciones
@@ -15,9 +34,9 @@ operativo — solo necesitas Python instalado.
 - **Estadísticas**: hoy y semana, mostradas en pantalla y logs
 - **Clima**: muestra el clima actual (configura `weather_city`)
 - **Mensajes personalizados**: edita `messages.json`
-- **Idioma**: español o inglés, detectado automáticamente del sistema (o fija `language` en la config)
+- **Idioma**: español o inglés, detectado del sistema (o fija `language` en la config)
 
-## Instalación
+### Instalación
 
 Requiere **Python 3** (con `tkinter`, viene incluido) y opcionalmente
 `ffplay` (sonido/música).
@@ -29,10 +48,9 @@ python3 descanso   # Linux/macOS
 python descanso    # Windows
 ```
 
-Eso es todo — corre directo desde la carpeta clonada, sin copiar nada
-ni compilar nada.
+Eso es todo — sin copiar nada ni compilar nada.
 
-### Auto-inicio (opcional)
+#### Auto-inicio (opcional)
 
 Si quieres que arranque solo con la sesión:
 
@@ -48,7 +66,7 @@ Si quieres que arranque solo con la sesión:
 - **Windows:** `Win+R` → `shell:startup` → acceso directo apuntando a
   `pythonw.exe C:\ruta\a\descansa-pls\descanso`.
 
-## Controles en pantalla
+### Controles en pantalla
 
 | Tecla | Acción |
 |---|---|
@@ -57,7 +75,7 @@ Si quieres que arranque solo con la sesión:
 | `Enter` | Desbloquear (cuando el timer termina) |
 | `Escape` | Cerrar (cuando el timer termina o modos sin timer) |
 
-## Configuración
+### Configuración
 
 Editar `~/.config/descanso-visual/config.json`:
 
@@ -83,7 +101,7 @@ Editar `~/.config/descanso-visual/config.json`:
 `language` acepta `"auto"` (detecta español o inglés del sistema),
 `"es"` o `"en"` para forzarlo.
 
-## Modos de pantalla
+### Modos de pantalla
 
 | Modo | Cuándo | Duración |
 |---|---|---|
@@ -93,7 +111,7 @@ Editar `~/.config/descanso-visual/config.json`:
 | Almuerzo | 12:00 | 10 min auto |
 | Dormir | 22:30 | 10 min auto |
 
-## Archivos de configuración
+### Archivos de configuración
 
 | Archivo | Ubicación |
 |---|---|
@@ -102,3 +120,37 @@ Editar `~/.config/descanso-visual/config.json`:
 | Estadísticas | `~/.config/descanso-visual/stats.json` |
 | Snooze flag | `~/.config/descanso-visual/snooze_until` |
 | Cache clima | `~/.config/descanso-visual/weather_cache` |
+
+---
+
+## Android (Kotlin)
+
+App ligera que agenda el próximo descanso con una alarma exacta (atraviesa
+Doze) y lo dispara como notificación full-screen, aunque la app esté cerrada
+o la pantalla bloqueada.
+
+### Características
+
+- **Recordatorio cada 20 min**, se re-agenda solo tras cada pausa
+- **Pantalla de pausa** con cuenta regresiva de 20s, tip aleatorio y vibración
+- **Posponer 5 min** o **Saltar** desde la propia pausa
+- **Pausar / Reanudar** los recordatorios desde la pantalla de inicio
+- **Descansos de hoy** y cuenta regresiva en vivo al próximo
+- **Sobrevive al reinicio** del teléfono (se re-agenda al arrancar)
+
+### Instalar
+
+Descarga el `app-debug.apk` de la última
+[Release](https://github.com/bramendev/descansa-pls/releases) e instálalo
+(activa "instalar apps de orígenes desconocidos"). Cada tag `v*` publica un
+APK automáticamente vía GitHub Actions.
+
+### Compilar
+
+```bash
+gradle -p android assembleDebug
+# APK en android/app/build/outputs/apk/debug/app-debug.apk
+```
+
+Requiere JDK 17 y Gradle 8.7. En el primer uso, Android pedirá permiso de
+notificaciones y de alarmas exactas.
