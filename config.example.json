@@ -11,5 +11,6 @@
   "animal": "perro",
   "theme": "dark",
   "weather_city": "",
-  "sound": true
+  "sound": true,
+  "language": "auto"
 }

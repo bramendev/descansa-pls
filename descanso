@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
+import functools
 import json
+import os
 import subprocess
 import sys
 import time
@@ -27,6 +29,69 @@ DEFAULT_CONFIG = {
     "theme": "dark",
     "weather_city": "",
     "sound": True,
+    "language": "auto",
+}
+
+def detect_lang():
+    for var in ('LC_ALL', 'LC_MESSAGES', 'LANG'):
+        val = os.environ.get(var, '')
+        if val:
+            return 'en' if val.lower().startswith('en') else 'es'
+    return 'es'
+
+LANG = detect_lang()
+
+STRINGS = {
+    'es': {
+        'banner_title': '── Descanso Visual ──',
+        'visual_line': '  Visual:   cada {mn} min  ({sec}s)',
+        'active_line': '  Activo:   cada {mn} min  ({sec}s)',
+        'water_line': '  Agua:     cada {mn} min  ({sec}s)',
+        'lunch_line': '  Almuerzo: {t}',
+        'sleep_line': '  Dormir:   {t}',
+        'animal_line': '  Animal:   {a}',
+        'theme_line': '  Tema:     {t}',
+        'music_line': '  Música:   {v}',
+        'sound_line': '  Sonido:   {v}',
+        'weather_line': '  Clima:    {w}',
+        'yes': 'sí', 'no': 'no',
+        'stats_header': '── Estadísticas ────',
+        'week_prefix': '  Semana: ',
+        'footer_bar': '────────────────────',
+        'mode_lunch': '⏰ Almuerzo',
+        'mode_sleep': '🌙 Dormir',
+        'mode_water': '💧 Agua',
+        'mode_active': '🏃 Pausa activa',
+        'mode_visual': '👀 Descanso visual',
+        'stopped': 'Detenido',
+        'labels': {'visual': 'visuales', 'activo': 'activas', 'almuerzo': 'almuerzos',
+                    'dormir': 'dormir', 'agua': 'aguas'},
+    },
+    'en': {
+        'banner_title': '── Visual Break ──',
+        'visual_line': '  Visual:   every {mn} min  ({sec}s)',
+        'active_line': '  Active:   every {mn} min  ({sec}s)',
+        'water_line': '  Water:    every {mn} min  ({sec}s)',
+        'lunch_line': '  Lunch:    {t}',
+        'sleep_line': '  Sleep:    {t}',
+        'animal_line': '  Animal:   {a}',
+        'theme_line': '  Theme:    {t}',
+        'music_line': '  Music:    {v}',
+        'sound_line': '  Sound:    {v}',
+        'weather_line': '  Weather:  {w}',
+        'yes': 'yes', 'no': 'no',
+        'stats_header': '── Stats ───────────',
+        'week_prefix': '  Week: ',
+        'footer_bar': '────────────────────',
+        'mode_lunch': '⏰ Lunch',
+        'mode_sleep': '🌙 Sleep',
+        'mode_water': '💧 Water',
+        'mode_active': '🏃 Active break',
+        'mode_visual': '👀 Visual break',
+        'stopped': 'Stopped',
+        'labels': {'visual': 'visual', 'activo': 'active', 'almuerzo': 'lunch',
+                    'dormir': 'sleep', 'agua': 'water'},
+    },
 }
 
 def load_config():
@@ -53,16 +118,15 @@ def load_stats():
 
 def stats_summary(stats):
     today = datetime.now().date().isoformat()
+    labels = STRINGS[LANG]['labels']
     parts = []
-    for modo, label in [('visual', 'visuales'), ('activo', 'activas'),
-                         ('almuerzo', 'almuerzos'), ('dormir', 'dormir'),
-                         ('agua', 'aguas')]:
+    for modo in ('visual', 'activo', 'almuerzo', 'dormir', 'agua'):
         if modo in stats:
             s = stats[modo]
             t = s['today'] if s.get('date') == today else 0
             tot = s['total']
             if t > 0 or tot > 0:
-                parts.append(f"{t} {label} (total {tot})")
+                parts.append(f"{t} {labels[modo]} (total {tot})")
     return parts
 
 def weekly_summary(stats):
@@ -74,9 +138,8 @@ def weekly_summary(stats):
         if day in stats.get('history', {}):
             for modo, count in stats['history'][day].items():
                 totals[modo] = totals.get(modo, 0) + count
+    labels = STRINGS[LANG]['labels']
     parts = []
-    labels = {'visual': 'visuales', 'activo': 'activas', 'agua': 'aguas',
-              'almuerzo': 'almuerzos', 'dormir': 'dormir'}
     for modo, count in sorted(totals.items(), key=lambda x: -x[1]):
         if modo in labels and count > 0:
             parts.append(f"{count} {labels[modo]}")
@@ -123,7 +186,7 @@ def stop_music(proc):
 
 def fetch_weather(city=""):
     try:
-        url = f"https://wttr.in/{city}?format=%t+%C&lang=es"
+        url = f"https://wttr.in/{city}?format=%t+%C&lang={LANG}"
         req = urllib.request.Request(url, headers={'User-Agent': 'curl/7.0'})
         resp = urllib.request.urlopen(req, timeout=5)
         return resp.read().decode().strip()
@@ -155,6 +218,7 @@ def is_snoozed():
         pass
     return False
 
+@functools.lru_cache(maxsize=None)
 def find_pantalla():
     script_dir = Path(__file__).resolve().parent
     candidates = [
@@ -182,8 +246,31 @@ def parse_time(t_str, day):
     h, m = t_str.split(':')
     return datetime(day.year, day.month, day.day, int(h), int(m))
 
+def print_update(show_weekly=False):
+    stats = load_stats()
+    for p in stats_summary(stats):
+        print(f"  {p}")
+    if show_weekly:
+        wparts = weekly_summary(stats)
+        if wparts:
+            print(f"{STRINGS[LANG]['week_prefix']}{'  ·  '.join(wparts)}")
+    return stats
+
+def trigger_break(mode, duration, animal, weather, use_sound, music_url=None, show_weekly=False):
+    if use_sound:
+        play_sound()
+    mp = play_music(music_url, duration)
+    launch_break(mode, duration, animal, weather)
+    stop_music(mp)
+    return print_update(show_weekly)
+
 def main():
     config = load_config()
+    global LANG
+    lang_cfg = config.get('language', 'auto')
+    if lang_cfg in ('es', 'en'):
+        LANG = lang_cfg
+    S = STRINGS[LANG]
     vi = config['visual_interval_min'] * 60
     ai = config['active_interval_min'] * 60
     wi = config['water_interval_min'] * 60
@@ -200,103 +287,70 @@ def main():
     weather_city = config.get('weather_city', '')
 
     weather = get_weather(weather_city) if weather_city else None
+    next_weather_check = time.time() + 1800
 
-    print("── Descanso Visual ──")
-    print(f"  Visual:   cada {config['visual_interval_min']} min  ({config['visual_duration_sec']}s)")
-    print(f"  Activo:   cada {config['active_interval_min']} min  ({config['active_duration_sec']}s)")
-    print(f"  Agua:     cada {config['water_interval_min']} min  ({config['water_duration_sec']}s)")
-    print(f"  Almuerzo: {config['lunch_time']}")
-    print(f"  Dormir:   {config['sleep_time']}")
-    print(f"  Animal:   {animal}")
-    print(f"  Tema:     {config.get('theme', 'dark')}")
-    print(f"  Música:   {'sí' if music else 'no'}")
-    print(f"  Sonido:   {'sí' if use_sound else 'no'}")
+    print(S['banner_title'])
+    print(S['visual_line'].format(mn=config['visual_interval_min'], sec=config['visual_duration_sec']))
+    print(S['active_line'].format(mn=config['active_interval_min'], sec=config['active_duration_sec']))
+    print(S['water_line'].format(mn=config['water_interval_min'], sec=config['water_duration_sec']))
+    print(S['lunch_line'].format(t=config['lunch_time']))
+    print(S['sleep_line'].format(t=config['sleep_time']))
+    print(S['animal_line'].format(a=animal))
+    print(S['theme_line'].format(t=config.get('theme', 'dark')))
+    print(S['music_line'].format(v=S['yes'] if music else S['no']))
+    print(S['sound_line'].format(v=S['yes'] if use_sound else S['no']))
     if weather:
-        print(f"  Clima:    {weather}")
+        print(S['weather_line'].format(w=weather))
     stats = load_stats()
     parts = stats_summary(stats)
     if parts:
-        print("── Estadísticas ────")
+        print(S['stats_header'])
         for p in parts:
             print(f"  {p}")
     wparts = weekly_summary(stats)
     if wparts:
-        print(f"  Semana: {'  ·  '.join(wparts)}")
-    print("────────────────────")
+        print(f"{S['week_prefix']}{'  ·  '.join(wparts)}")
+    print(S['footer_bar'])
 
     while True:
         now = datetime.now()
         hoy = now.date()
 
-        weather = get_weather(weather_city) if weather_city else None
+        if weather_city and time.time() >= next_weather_check:
+            weather = get_weather(weather_city)
+            next_weather_check = time.time() + 1800
 
         if last_lunch_date != hoy:
             lunch = parse_time(config['lunch_time'], hoy)
             if lunch <= now <= lunch + timedelta(minutes=30):
-                print(f"[{now.strftime('%H:%M')}] ⏰ Almuerzo")
-                if use_sound:
-                    play_sound()
-                launch_break('almuerzo', 0, animal, weather)
-                stats = load_stats()
-                for p in stats_summary(stats):
-                    print(f"  {p}")
-                wparts = weekly_summary(stats)
-                if wparts:
-                    print(f"  Semana: {'  ·  '.join(wparts)}")
+                print(f"[{now.strftime('%H:%M')}] {S['mode_lunch']}")
+                trigger_break('almuerzo', 0, animal, weather, use_sound, show_weekly=True)
                 last_lunch_date = hoy
 
         if last_sleep_date != hoy:
             sleep_t = parse_time(config['sleep_time'], hoy)
             if sleep_t <= now <= sleep_t + timedelta(minutes=30):
-                print(f"[{now.strftime('%H:%M')}] 🌙 Dormir")
-                if use_sound:
-                    play_sound()
-                launch_break('dormir', 0, animal, weather)
-                stats = load_stats()
-                for p in stats_summary(stats):
-                    print(f"  {p}")
-                wparts = weekly_summary(stats)
-                if wparts:
-                    print(f"  Semana: {'  ·  '.join(wparts)}")
+                print(f"[{now.strftime('%H:%M')}] {S['mode_sleep']}")
+                trigger_break('dormir', 0, animal, weather, use_sound, show_weekly=True)
                 last_sleep_date = hoy
 
         if not is_snoozed():
             if time.time() >= next_water:
-                print(f"[{now.strftime('%H:%M')}] 💧 Agua")
-                if use_sound:
-                    play_sound()
-                launch_break('agua', config['water_duration_sec'], animal, weather)
-                stats = load_stats()
-                for p in stats_summary(stats):
-                    print(f"  {p}")
+                print(f"[{now.strftime('%H:%M')}] {S['mode_water']}")
+                trigger_break('agua', config['water_duration_sec'], animal, weather, use_sound)
                 next_water = time.time() + wi
 
             if time.time() >= next_active:
-                print(f"[{now.strftime('%H:%M')}] 🏃 Pausa activa")
-                if use_sound:
-                    play_sound()
-                _mp = play_music(music, config['active_duration_sec'])
-                launch_break('activo', config['active_duration_sec'], animal, weather)
-                stop_music(_mp)
-                stats = load_stats()
-                for p in stats_summary(stats):
-                    print(f"  {p}")
-                wparts = weekly_summary(stats)
-                if wparts:
-                    print(f"  Semana: {'  ·  '.join(wparts)}")
+                print(f"[{now.strftime('%H:%M')}] {S['mode_active']}")
+                trigger_break('activo', config['active_duration_sec'], animal, weather, use_sound,
+                               music_url=music, show_weekly=True)
                 next_active = time.time() + ai
                 next_visual = time.time() + ai
 
             if time.time() >= next_visual:
-                print(f"[{now.strftime('%H:%M')}] 👀 Descanso visual")
-                if use_sound:
-                    play_sound()
-                _mp = play_music(music, config['visual_duration_sec'])
-                launch_break('visual', config['visual_duration_sec'], animal, weather)
-                stop_music(_mp)
-                stats = load_stats()
-                for p in stats_summary(stats):
-                    print(f"  {p}")
+                print(f"[{now.strftime('%H:%M')}] {S['mode_visual']}")
+                trigger_break('visual', config['visual_duration_sec'], animal, weather, use_sound,
+                               music_url=music)
                 next_visual = time.time() + vi
 
         time.sleep(5)
@@ -305,4 +359,4 @@ if __name__ == '__main__':
     try:
         main()
     except KeyboardInterrupt:
-        print("\nDetenido")
+        print(f"\n{STRINGS[LANG]['stopped']}")

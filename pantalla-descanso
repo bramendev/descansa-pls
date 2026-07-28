@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import tkinter as tk
 from tkinter import ttk, font
+import os
 import random
 import time
 import json
@@ -22,10 +23,6 @@ SNOOZE_FILE = CONFIG_DIR / 'snooze_until'
 TIENE_TIMER = MODO in ('visual', 'activo')
 MONO = "Consolas" if sys.platform == "win32" else "monospace"
 SANS = "Segoe UI" if sys.platform == "win32" else "sans-serif"
-
-def _center(frames):
-    w = max(len(l) for f in frames for l in f)
-    return [[l.center(w) for l in f] for f in frames]
 
 def load_config():
     try:
@@ -74,18 +71,14 @@ def increment_stat(modo):
 def get_stats_line(stats):
     today = date.today().isoformat()
     parts = []
-    for modo, (label, icon) in {
-        'visual': ('visuales', '👁'), 'activo': ('activas', '🏃'),
-        'almuerzo': ('almuerzos', '🍽'), 'dormir': ('dormir', '🌙'),
-        'agua': ('aguas', '💧')
-    }.items():
+    for modo, (label, icon) in UI['stats_labels'].items():
         if modo in stats:
             s = stats[modo]
             t = s['today'] if s.get('date') == today else 0
             if t > 0:
                 parts.append(f"{icon} {t} {label}")
     if not parts:
-        return "Hoy aún no hay pausas registradas"
+        return UI['no_stats']
     return "  ·  ".join(parts)
 
 def get_weekly_line(stats):
@@ -100,15 +93,13 @@ def get_weekly_line(stats):
     if not totals:
         return ""
     parts = []
-    labels = {'visual': ('visuales', '👁'), 'activo': ('activas', '🏃'),
-              'agua': ('aguas', '💧'), 'almuerzo': ('almuerzos', '🍽'),
-              'dormir': ('dormir', '🌙')}
+    labels = UI['stats_labels']
     for modo, count in sorted(totals.items(), key=lambda x: -x[1]):
         if modo in labels and count > 0:
             parts.append(f"{labels[modo][1]} {count} {labels[modo][0]}")
     if not parts:
         return ""
-    return "Semana: " + "  ·  ".join(parts)
+    return UI['week_prefix'] + "  ·  ".join(parts)
 
 def write_snooze():
     CONFIG_DIR.mkdir(parents=True, exist_ok=True)
@@ -124,46 +115,136 @@ def load_custom_messages():
         pass
     return {}
 
+def detect_lang():
+    for var in ('LC_ALL', 'LC_MESSAGES', 'LANG'):
+        val = os.environ.get(var, '')
+        if val:
+            return 'en' if val.lower().startswith('en') else 'es'
+    return 'es'
+
+config = load_config()
+_lang_cfg = config.get('language', 'auto')
+LANG = _lang_cfg if _lang_cfg in ('es', 'en') else detect_lang()
+
+_WEEKDAYS = {
+    'es': ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'],
+    'en': ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
+}
+_MONTHS = {
+    'es': ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio',
+           'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'],
+    'en': ['January', 'February', 'March', 'April', 'May', 'June', 'July',
+           'August', 'September', 'October', 'November', 'December'],
+}
+
+def format_date(dt):
+    wd = _WEEKDAYS[LANG][dt.weekday()]
+    mo = _MONTHS[LANG][dt.month - 1]
+    if LANG == 'es':
+        return f"{wd}, {dt.day} de {mo} de {dt.year}"
+    return f"{wd}, {mo} {dt.day}, {dt.year}"
+
+UI = {
+    'es': {
+        'titles': {
+            'visual': 'DESCANSO VISUAL', 'activo': 'PAUSA ACTIVA',
+            'almuerzo': 'HORA DE ALMORZAR', 'dormir': 'HORA DE DORMIR',
+            'agua': 'HIDRATACIÓN',
+        },
+        'stats_labels': {
+            'visual': ('visuales', '👁'), 'activo': ('activas', '🏃'),
+            'almuerzo': ('almuerzos', '🍽'), 'dormir': ('dormir', '🌙'),
+            'agua': ('aguas', '💧'),
+        },
+        'no_stats': 'Hoy aún no hay pausas registradas',
+        'week_prefix': 'Semana: ',
+        'timer_text': 'Descansa {s} segundos más…',
+        'timer_done': '¡Ya puedes continuar!',
+        'hint_timer': 'Espacio: saltar  ·  Z: snooze 5 min',
+        'hint_notimer': 'Espacio o Z: cerrar',
+        'btn_close': 'Cerrar',
+        'btn_unlock': 'Desbloquear',
+        'foot_agua': 'Bebe despacio, disfruta cada sorbo.',
+        'foot_otro': 'Tómate tu tiempo, la pantalla seguirá aquí.',
+    },
+    'en': {
+        'titles': {
+            'visual': 'VISUAL BREAK', 'activo': 'ACTIVE BREAK',
+            'almuerzo': 'LUNCH TIME', 'dormir': 'BEDTIME',
+            'agua': 'HYDRATION',
+        },
+        'stats_labels': {
+            'visual': ('visual', '👁'), 'activo': ('active', '🏃'),
+            'almuerzo': ('lunches', '🍽'), 'dormir': ('sleep', '🌙'),
+            'agua': ('water', '💧'),
+        },
+        'no_stats': 'No breaks logged today yet',
+        'week_prefix': 'Week: ',
+        'timer_text': 'Rest {s} more seconds…',
+        'timer_done': 'You can continue now!',
+        'hint_timer': 'Space: skip  ·  Z: snooze 5 min',
+        'hint_notimer': 'Space or Z: close',
+        'btn_close': 'Close',
+        'btn_unlock': 'Unlock',
+        'foot_agua': 'Drink slowly, enjoy every sip.',
+        'foot_otro': 'Take your time, the screen will still be here.',
+    },
+}[LANG]
+
 custom = load_custom_messages()
 
+# "Noodles" - classic ASCII dog (asciiart.eu/animals/dogs), used verbatim.
+_DOG_EARS = "       /^-^\\"
+_DOG_ROW2 = "     /   Y   \\"
+_DOG_ROW3 = "     V \\ v / V"
+_DOG_ROW4 = "       / - \\"
+_DOG_ROW7 = " ===/___) ||"
+_DOG_EYES_OPEN = "      / o o \\"
+_DOG_EYES_BLINK = "      / - - \\"
+
+# la cola real es el "(" de la esquina inferior izquierda: menea subiendo a la
+# fila 5 (arriba) o bajando a la 6 (abajo). El cuerpo "===/___)" queda fijo.
+_DOG_R5_UP = "(     /    |"
+_DOG_R5_DOWN = "      /    |"
+_DOG_R6_UP = "     /     |"
+_DOG_R6_DOWN = "(    /     |"
+
+def _dog_frame(eyes, tail_up):
+    r5 = _DOG_R5_UP if tail_up else _DOG_R5_DOWN
+    r6 = _DOG_R6_UP if tail_up else _DOG_R6_DOWN
+    return "\n".join([_DOG_EARS, eyes, _DOG_ROW2, _DOG_ROW3, _DOG_ROW4,
+                       r5, r6, _DOG_ROW7])
+
 _DOG = [
-    "     / \\__\n    (    @\\___\n    /          O\n   /    (_____/\n  /_____/    U    ",
-    "     / \\__\n    (    @\\___\n    /          O\n   /    (_____/\n  /_____/   ~U   ",
-    "     / \\__\n    (    @\\___\n    /          O\n   /    (_____/\n  /_____/  ~~U   ",
-    "     / \\__\n    (    @\\___\n    /          O\n   /    (_____/\n  /_____/ ~~~U   ",
-    "     / \\__\n    (    @\\___\n    /          O\n   /    (_____/\n  /_____/  ~~U   ",
-    "     / \\__\n    (    @\\___\n    /          O\n   /    (_____/\n  /_____/   ~U   ",
-    "     / \\__\n    (    @\\___\n    /          O\n   /    (_____/\n  /_____/    U    ",
-    "      / \\__\n     (    @\\___\n     /          O\n    /    (_____/\n   /_____/    U   ",
+    _dog_frame(_DOG_EYES_OPEN, False),
+    _dog_frame(_DOG_EYES_OPEN, True),
+    _dog_frame(_DOG_EYES_OPEN, False),
+    _dog_frame(_DOG_EYES_OPEN, True),
+    _dog_frame(_DOG_EYES_BLINK, False),
+    _dog_frame(_DOG_EYES_OPEN, True),
+    _dog_frame(_DOG_EYES_OPEN, False),
+    _dog_frame(_DOG_EYES_OPEN, True),
 ]
 
-_CAT = [
-    "   |\\      _,,,---,,_\n   /,`.-'`'    -.  ;-;;,_\n  |,4-  ) )-,_..;\\ (  `'-' \n '---''(_/--'  `-'\\_)     ",
-    "   |\\      _,,,---,,_\n   /,`.-'`'    -.  ;-;;,_\n  |,-  ) )-,_..;\\ (  `'-' \n '---''(_/--'  `-'\\~)    ",
-    "   |\\      _,,,---,,_\n   /,`.-'`'    -.  ;-;;,_\n  |,^  ) )-,_..;\\ (  `'-' \n '---''(_/--'  `-'\\~)    ",
-    "   |\\      _,,,---,,_\n   /,`.-'`'    -.  ;-;;,_\n  |,-  ) )-,_..;\\ (  `'-' \n '---''(_/--'  `-'\\~)    ",
-    "   |\\      _,,,---,,_\n   /,`.-'`'    -.  ;-;;,_\n  |,4-  ) )-,_..;\\ (  `'-' \n '---''(_/--'  `-'\\_)     ",
-    "   |\\      _,,,---,,_\n   /,`.-'`'    -.  ;-;;,_\n  |,4-  ) )-,_..;\\ (  `'-' \n  ---''(_/--'  `-'\\_)    ",
-    "   |\\      _,,,---,,_\n   /,`.-'`'    -.  ;-;;,_\n  |,4-  ) )-,_..;\\ (  `'-' \n   --''(_/--'  `-'\\_)    ",
-    "   |\\      _,,,---,,_\n   /,`.-'`'    -.  ;-;;,_\n  |,4-  ) )-,_..;\\ (  `'-' \n  ---''(_/--'  `-'\\_)    ",
-]
+_CAT_OPEN = " /\\_/\\\n( o.o )\n > ^ <"
+_CAT_BLINK = " /\\_/\\\n( -.- )\n > ^ <"
+_CAT = [_CAT_OPEN] * 5 + [_CAT_BLINK] + [_CAT_OPEN] * 2
 
 FRAMES = _DOG if ANIMAL not in ('gato', 'cat', 'g') else _CAT
 
 def _normalize_frames(frames):
     parts = [f.split('\n') for f in frames]
     max_lines = max(len(p) for p in parts)
-    max_w = max(len(l) for p in parts for l in p)
     result = []
     for p in parts:
         pad_top = max_lines - len(p)
-        padded = [' ' * max_w] * pad_top + [l.ljust(max_w) for l in p]
+        padded = [''] * pad_top + p
         result.append('\n'.join(padded))
     return result
 
 FRAMES = _normalize_frames(FRAMES)
 
-_CURIOSIDADES = [
+_CURIOSIDADES = ([
     "Los pulpos tienen tres corazones y su sangre es azul.",
     "Un día en Venus dura más que un año en Venus.",
     "Las hormigas nunca duermen; toman micro-siestas de 8 segundos.",
@@ -179,9 +260,25 @@ _CURIOSIDADES = [
     "Los gatos no pueden saborear lo dulce.",
     "Los pingüinos proponen matrimonio con una piedra.",
     "Tu cuerpo reemplaza millones de células cada segundo.",
-] + custom.get('curiosidades', [])
+] if LANG == 'es' else [
+    "Octopuses have three hearts and their blood is blue.",
+    "A day on Venus lasts longer than a year on Venus.",
+    "Ants never sleep; they take 8-second micro-naps.",
+    "The human heart beats about 100,000 times a day.",
+    "Hot water can freeze faster than cold water.",
+    "Flamingos aren't born pink, they turn pink from their diet.",
+    "Honey never spoils.",
+    "A typical cloud weighs about 500 tons.",
+    "Koalas have fingerprints almost identical to humans'.",
+    "Earth travels at 107,000 km/h around the Sun.",
+    "Resting your eyes for 20 seconds every 20 minutes cuts eye strain by 40%.",
+    "There are more stars in the universe than grains of sand on every beach.",
+    "Cats can't taste sweetness.",
+    "Penguins propose with a pebble.",
+    "Your body replaces millions of cells every second.",
+]) + custom.get('curiosidades', [])
 
-_EJERCICIOS = [
+_EJERCICIOS = ([
     "Estira los brazos hacia arriba — 15 segundos",
     "Gira los hombros hacia atrás — 10 repeticiones",
     "Inclina la cabeza a la izquierda — 15s cada lado",
@@ -194,9 +291,22 @@ _EJERCICIOS = [
     "Gira la cintura — 5 veces cada lado",
     "Abre el pecho con brazos atrás — 15 segundos",
     "Respira profundo: 4s inspira, 4s mantén, 4s exhala",
-] + custom.get('ejercicios', [])
+] if LANG == 'es' else [
+    "Stretch your arms up — 15 seconds",
+    "Roll your shoulders back — 10 reps",
+    "Tilt your head sideways — 15s each side",
+    "Open and close your hands — 10 times",
+    "Arch your back gently — 10 seconds",
+    "Take a short walk — 2 minutes",
+    "Ankle circles — 10 times each foot",
+    "Stretch your legs — 15 seconds each",
+    "Shrug your shoulders — 10 times",
+    "Twist your waist — 5 times each side",
+    "Open your chest, arms back — 15 seconds",
+    "Breathe deep: 4s in, 4s hold, 4s out",
+]) + custom.get('ejercicios', [])
 
-_MOTIVACIONALES = [
+_MOTIVACIONALES = ([
     "Cada paso cuenta, no importa cuán pequeño.",
     "El progreso, no la perfección.",
     "Tu esfuerzo de hoy es tu fuerza de mañana.",
@@ -209,32 +319,64 @@ _MOTIVACIONALES = [
     "Respira profundo. Esto también pasará.",
     "Pequeños hábitos, grandes cambios.",
     "El mejor momento para empezar es ahora.",
-] + custom.get('motivacionales', [])
+] if LANG == 'es' else [
+    "Every step counts, no matter how small.",
+    "Progress, not perfection.",
+    "Today's effort is tomorrow's strength.",
+    "Don't give up, you're closer than you think.",
+    "Discipline is the bridge between goals and results.",
+    "A break now is energy for later.",
+    "Take care of your body, it's the only place you have to live.",
+    "Consistency beats talent.",
+    "Your health is your greatest investment.",
+    "Breathe deep. This too shall pass.",
+    "Small habits, big changes.",
+    "The best time to start is now.",
+]) + custom.get('motivacionales', [])
 
-_COMIDAS = [
+_COMIDAS = ([
     "Come algo nutritivo y equilibrado.",
     "Tómate mínimo 20 minutos para comer sin prisas.",
     "Aléjate de la pantalla mientras comes.",
     "Hidrátate bien con agua.",
     "Incluye proteínas y verduras en tu plato.",
-] + custom.get('comidas', [])
+] if LANG == 'es' else [
+    "Eat something nutritious and balanced.",
+    "Take at least 20 minutes to eat without rushing.",
+    "Step away from the screen while you eat.",
+    "Stay well hydrated with water.",
+    "Include protein and vegetables on your plate.",
+]) + custom.get('comidas', [])
 
-_DORMIR_TIPS = [
+_DORMIR_TIPS = ([
     "Apaga todas las pantallas 30 min antes de dormir.",
     "Prepara tu habitación: oscura, fresca y silenciosa.",
     "Lee un libro antes de dormir.",
     "Evita cafeína después de las 6 PM.",
     "Respira profundamente 5 veces: 4-7-8.",
     "Desconecta las notificaciones del teléfono.",
-] + custom.get('dormir', [])
+] if LANG == 'es' else [
+    "Turn off all screens 30 minutes before bed.",
+    "Set up your room: dark, cool, and quiet.",
+    "Read a book before sleeping.",
+    "Avoid caffeine after 6 PM.",
+    "Breathe deeply 5 times: 4-7-8.",
+    "Turn off your phone notifications.",
+]) + custom.get('dormir', [])
 
-_AGUA_MSGS = [
+_AGUA_MSGS = ([
     "¡Toma un vaso de agua!",
     "Hidrátate, tu cuerpo lo necesita.",
     "Un vaso de agua ahora te dará energía.",
     "Beber agua mejora tu concentración.",
     "Tu cerebro es 75% agua. ¡Hidrátalo!",
-] + custom.get('agua', [])
+] if LANG == 'es' else [
+    "Drink a glass of water!",
+    "Hydrate, your body needs it.",
+    "A glass of water now will give you energy.",
+    "Drinking water improves your focus.",
+    "Your brain is 75% water. Hydrate it!",
+]) + custom.get('agua', [])
 
 BOWL = [" .-._.-. ", "(  o o  )", " \\ o o / ", "  `---'  "]
 MOON = ["   .-.   ", "  (   )  ", "   `-'   ", "  *   *  ", "   * *   "]
@@ -291,18 +433,11 @@ def make_theme(modo, theme_name):
         },
     }
 
-    titles = {
-        'visual': 'DESCANSO VISUAL', 'activo': 'PAUSA ACTIVA',
-        'almuerzo': 'HORA DE ALMORZAR', 'dormir': 'HORA DE DORMIR',
-        'agua': 'HIDRATACIÓN',
-    }
-
     t = {'bg': bg, 'clock': clock, 'date': date_c, 'info': info, 'ptrack': ptrack}
     t.update(accents.get(modo, accents['visual']))
-    t['title_txt'] = titles.get(modo, 'DESCANSO')
+    t['title_txt'] = UI['titles'].get(modo, UI['titles']['visual'])
     return t
 
-config = load_config()
 theme_pref = config.get('theme', 'dark')
 if theme_pref == 'auto':
     hour = datetime.now().hour
@@ -374,13 +509,15 @@ class PantallaDescanso:
             y = 1
 
         if TIENE_TIMER:
-            sample = FRAMES[0].split('\n')
-            fw = max(len(l) for l in sample)
-            fh = len(sample)
-            self.canvas_animal = tk.Canvas(f, bg=T['bg'], highlightthickness=0,
-                width=fw * 10, height=fh * 18)
-            self.canvas_animal.pack(pady=(20,0))
             self.animal_font = tk.font.Font(family=MONO, size=14)
+            n_lines = len(FRAMES[0].split('\n'))
+            line_h = self.animal_font.metrics('linespace')
+            canvas_w = max(self.animal_font.measure(l)
+                           for fr in FRAMES for l in fr.split('\n')) + 10
+            canvas_h = line_h * n_lines + 10
+            self.canvas_animal = tk.Canvas(f, bg=T['bg'], highlightthickness=0,
+                width=canvas_w, height=canvas_h)
+            self.canvas_animal.pack(pady=(20,0))
             self._render_animal_frame(0)
 
             self.label_timer = tk.Label(f, bg=T['bg'], fg=T['timer'],
@@ -409,7 +546,7 @@ class PantallaDescanso:
             tk.Label(f, bg=T['bg'], fg=T['text'],
                 font=(SANS, 20), wraplength=600, text=random.choice(pool)).pack(pady=(12, 0))
 
-            foot = "Bebe despacio, disfruta cada sorbo." if MODO == 'agua' else "Tómate tu tiempo, la pantalla seguirá aquí."
+            foot = UI['foot_agua'] if MODO == 'agua' else UI['foot_otro']
             tk.Label(f, bg=T['bg'], fg=T['info'],
                 font=(SANS, 14, 'italic'), text=foot).pack(pady=(12, 0))
 
@@ -428,7 +565,7 @@ class PantallaDescanso:
             auto_ms = 10000 if MODO == 'agua' else 600000
             self.root.after(auto_ms, self.do_skip)
 
-        btn_text = "Cerrar" if not TIENE_TIMER else "Desbloquear"
+        btn_text = UI['btn_close'] if not TIENE_TIMER else UI['btn_unlock']
         self.btn = tk.Button(f, text=btn_text,
             font=(SANS, 16, 'bold'), bg=T['btn'], fg='white',
             activebackground=T['bord'], activeforeground='white',
@@ -440,7 +577,7 @@ class PantallaDescanso:
         else:
             self.btn.pack(pady=(16, 0))
 
-        hint = "Espacio: saltar  ·  Z: snooze 5 min" if TIENE_TIMER else "Espacio o Z: cerrar"
+        hint = UI['hint_timer'] if TIENE_TIMER else UI['hint_notimer']
         tk.Label(f, bg=T['bg'], fg=T['date'],
             font=(SANS, 11), text=hint).pack(pady=(8, 0))
 
@@ -469,18 +606,16 @@ class PantallaDescanso:
     def _tick(self):
         ahora = time.localtime()
         self.label_clock.config(text=time.strftime("%H:%M", ahora))
-        self.label_date.config(text=time.strftime("%A, %d de %B de %Y", ahora).capitalize())
+        self.label_date.config(text=format_date(datetime.now()))
         self.root.after(1000, self._tick)
 
     def _render_animal_frame(self, idx):
         self.canvas_animal.delete("all")
-        lines = FRAMES[idx].split('\n')
-        fh = 18
-        for i, line in enumerate(lines):
-            self.canvas_animal.create_text(
-                self.canvas_animal.winfo_reqwidth() // 2, i * fh + 2,
-                text=line, font=self.animal_font, fill=T['animal'],
-                anchor='n', justify='center')
+        self.canvas_animal.create_text(
+            self.canvas_animal.winfo_reqwidth() // 2,
+            self.canvas_animal.winfo_reqheight() // 2,
+            text=FRAMES[idx], font=self.animal_font, fill=T['animal'],
+            anchor='center', justify='left')
 
     def _animar(self):
         n = len(FRAMES)
@@ -494,11 +629,11 @@ class PantallaDescanso:
         self.tiempo_restante = int(restante)
         pct = min(transcurrido / SEGUNDOS, 1.0) * 100
         self.progress['value'] = pct
-        self.label_timer.config(text=f"Descansa {int(restante)} segundos más…")
+        self.label_timer.config(text=UI['timer_text'].format(s=int(restante)))
 
         if restante <= 0:
             self.progress['value'] = 100
-            self.label_timer.config(text="¡Ya puedes continuar!")
+            self.label_timer.config(text=UI['timer_done'])
             self.btn.pack(pady=(16, 0))
             self.btn_x.config(state='normal', fg=T['date'])
             return

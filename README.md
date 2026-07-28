@@ -1,7 +1,8 @@
 # Descanso Visual
 
 Recordatorio automático de pausas con pantalla simulada de bloqueo.
-Un solo código **Python + tkinter** para Linux y Windows.
+Un solo script en **Python + tkinter**, funciona igual en cualquier sistema
+operativo — solo necesitas Python instalado.
 
 ## Características
 
@@ -14,53 +15,38 @@ Un solo código **Python + tkinter** para Linux y Windows.
 - **Estadísticas**: hoy y semana, mostradas en pantalla y logs
 - **Clima**: muestra el clima actual (configura `weather_city`)
 - **Mensajes personalizados**: edita `messages.json`
+- **Idioma**: español o inglés, detectado automáticamente del sistema (o fija `language` en la config)
 
-## Linux
+## Instalación
 
-```bash
-# instalar
-cp descanso ~/.local/bin/
-cp pantalla-descanso ~/.local/bin/
-
-# iniciar ahora
-systemctl --user start descanso
-
-# auto-inicio
-systemctl --user enable descanso
-
-# logs
-journalctl --user -u descanso -f
-
-# ejecutar manual
-~/.local/bin/descanso
-```
-
-Requiere: `python3` + `tkinter` (viene con Python) + `ffplay` (para sonido/música, opcional).
-
-## Windows
-
-### Opción A: .exe (recomendado)
-
-1. Ejecutar `windows\build.bat` — convierte los scripts a .exe con ps2exe
-2. Copiar `windows\descanso.exe` y `windows\pantalla-descanso.exe` a `C:\Users\tuUsuario\scripts\`
-3. **Auto-inicio:** `Win+R` → `shell:startup` → acceso directo a `descanso.exe`
-
-### Opción B: Python directo
-
-1. Instalar Python 3 (con tkinter incluido)
-2. Ejecutar `python descanso` desde la terminal
-
-## Instalación desde cero
+Requiere **Python 3** (con `tkinter`, viene incluido) y opcionalmente
+`ffplay` (sonido/música).
 
 ```bash
 git clone git@github.com:bramendev/descansa-pls.git
 cd descansa-pls
-cp descanso ~/.local/bin/
-cp pantalla-descanso ~/.local/bin/
-# Linux: copiar servicio systemd
-cp linux/descanso.service ~/.config/systemd/user/
-systemctl --user daemon-reload
+python3 descanso   # Linux/macOS
+python descanso    # Windows
 ```
+
+Eso es todo — corre directo desde la carpeta clonada, sin copiar nada
+ni compilar nada.
+
+### Auto-inicio (opcional)
+
+Si quieres que arranque solo con la sesión:
+
+- **Linux (systemd):**
+  ```bash
+  cp descanso ~/.local/bin/
+  cp pantalla-descanso ~/.local/bin/
+  cp descanso.service ~/.config/systemd/user/
+  systemctl --user daemon-reload
+  systemctl --user enable --now descanso
+  journalctl --user -u descanso -f   # logs
+  ```
+- **Windows:** `Win+R` → `shell:startup` → acceso directo apuntando a
+  `pythonw.exe C:\ruta\a\descansa-pls\descanso`.
 
 ## Controles en pantalla
 
@@ -89,9 +75,13 @@ Editar `~/.config/descanso-visual/config.json`:
   "animal": "perro",
   "theme": "dark",
   "weather_city": "",
-  "sound": true
+  "sound": true,
+  "language": "auto"
 }
 ```
+
+`language` acepta `"auto"` (detecta español o inglés del sistema),
+`"es"` o `"en"` para forzarlo.
 
 ## Modos de pantalla
 
