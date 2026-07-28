@@ -10,12 +10,17 @@ Dos versiones que comparten la misma idea:
 
 | | Escritorio | Android |
 |---|---|---|
-| Recordatorios | visual, activo, agua, almuerzo, dormir | cada 20 min |
+| Recordatorios | visual, activo, agua, almuerzo, dormir | los mismos cinco, activables por separado |
 | Pantalla de pausa | bloqueo con ASCII art animado | full-screen con cuenta regresiva |
 | Posponer / saltar | Z (snooze 5 min) / Espacio | botones en pantalla |
 | Pausar recordatorios | — | botón Pausar / Reanudar |
+| Estadísticas | hoy, semana y total | hoy, semana con gráfico de 7 días, total y racha |
+| Configuración | `config.json` | botón ⚙ en la app |
+| No molestar | — | franja horaria configurable |
 | Sobrevive reinicio | systemd / inicio de sesión | sí (arranca tras reboot) |
 | Idioma | ES / EN automático | ES |
+
+El historial de versiones está en [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
@@ -131,19 +136,44 @@ o la pantalla bloqueada.
 
 ### Características
 
-- **Recordatorio cada 20 min**, se re-agenda solo tras cada pausa
-- **Pantalla de pausa** con cuenta regresiva de 20s, tip aleatorio y vibración
+- **Cinco modos** activables por separado, cada uno con su intervalo, su
+  duración y sus tips:
+
+  | Modo | Cadencia por defecto | Activo de fábrica |
+  |---|---|---|
+  | 👀 Descanso visual | cada 20 min | sí |
+  | 💧 Hidratación | cada 30 min | no |
+  | 🏃 Pausa activa | cada 60 min | no |
+  | 🍽 Hora de almorzar | a las 12:00 | no |
+  | 🌙 Hora de dormir | a las 22:30 | no |
+
+- **Configuración** con el botón ⚙: modos, intervalos, duraciones, horas fijas,
+  vibración, tips propios y horario de silencio
+- **No molestar** (22:00–8:00 por defecto): los avisos que caerían dentro se
+  corren al final de la franja. La hora de dormir es la excepción a propósito
+- **Pantalla de pausa** con cuenta regresiva, tip aleatorio y vibración
 - **Posponer 5 min** o **Saltar** desde la propia pausa
-- **Pausar / Reanudar** los recordatorios desde la pantalla de inicio
-- **Descansos de hoy** y cuenta regresiva en vivo al próximo
-- **Sobrevive al reinicio** del teléfono (se re-agenda al arrancar)
+- **Pausar / Reanudar** todos los recordatorios desde la pantalla de inicio
+- **Estadísticas**: hoy, semana y total, gráfico de barras de los 7 días y
+  **racha** de días seguidos
+- **Notificación fija** con la cuenta atrás al próximo descanso, llevada por el
+  cronómetro del sistema (no gasta batería refrescándose)
+- **Sobrevive al reinicio** del teléfono y a las actualizaciones de la app
 
 ### Instalar
 
 Descarga el `app-debug.apk` de la última
 [Release](https://github.com/bramendev/descansa-pls/releases) e instálalo
 (activa "instalar apps de orígenes desconocidos"). Cada tag `v*` publica un
-APK automáticamente vía GitHub Actions.
+APK automáticamente vía GitHub Actions, con las notas sacadas del
+[CHANGELOG](CHANGELOG.md).
+
+> **Nota de seguridad**: el APK publicado se compila con `assembleDebug`, así
+> que va firmado con la clave de depuración de Android, que es pública y la
+> misma para todo el mundo. Cualquiera puede firmar un APK con esa clave y
+> Android lo aceptaría como actualización de este. Para una distribución seria
+> hace falta un `assembleRelease` firmado con un keystore propio guardado en
+> los secrets del repositorio.
 
 ### Compilar
 

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Ojo abierto = descanso visual. Todo queda dentro de los 72dp centrales del
+  lienzo de 108dp, la zona segura del icono adaptativo (los launchers recortan
+  el resto en círculo, cuadrado o gota según el sistema).
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- párpado -->
+    <path
+        android:pathData="M24,54 C38,32 70,32 84,54 C70,76 38,76 24,54 Z"
+        android:strokeColor="#6E8CFF"
+        android:strokeWidth="6"
+        android:strokeLineJoin="round"
+        android:strokeLineCap="round"/>
+
+    <!-- iris -->
+    <path
+        android:pathData="M43,54 a11,11 0 1,0 22,0 a11,11 0 1,0 -22,0"
+        android:fillColor="#6E8CFF"/>
+
+    <!-- brillo -->
+    <path
+        android:pathData="M57,49 a3.5,3.5 0 1,0 7,0 a3.5,3.5 0 1,0 -7,0"
+        android:fillColor="#E6E6FF"/>
+</vector>

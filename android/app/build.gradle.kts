@@ -11,8 +11,9 @@ android {
         applicationId = "com.bramen.descanso"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        // versionName lo pasa el CI desde el tag git (-Pvname=v1.2); "dev" en local.
+        // Ambos los pasa el CI: el nombre desde el tag git (-Pvname=v1.4) y el
+        // código desde el número de ejecución, que siempre sube. En local, 1/"dev".
+        versionCode = (project.findProperty("vcode") as String?)?.toIntOrNull() ?: 1
         versionName = (project.findProperty("vname") as String?) ?: "dev"
     }
 

@@ -11,7 +11,9 @@
 
     <application
         android:label="Descanso"
-        android:icon="@android:drawable/ic_dialog_info"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher"
+        android:usesCleartextTraffic="false"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
 
         <activity
@@ -33,9 +35,18 @@
 
         <receiver android:name=".BreakReceiver" android:exported="false"/>
 
-        <receiver android:name=".BootReceiver" android:exported="true">
+        <!--
+            Tiene que estar exportado para recibir BOOT_COMPLETED del sistema, pero
+            solo el sistema puede emitir esa acción con este permiso; además el
+            receiver comprueba la acción antes de hacer nada.
+        -->
+        <receiver
+            android:name=".BootReceiver"
+            android:exported="true"
+            android:permission="android.permission.RECEIVE_BOOT_COMPLETED">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
             </intent-filter>
         </receiver>
     </application>

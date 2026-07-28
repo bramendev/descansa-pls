@@ -26,6 +26,9 @@ class BreakActivity : Activity() {
     override fun onCreate(s: Bundle?) {
         super.onCreate(s)
         if (Build.VERSION.SDK_INT >= 27) { setShowWhenLocked(true); setTurnScreenOn(true) }
+
+        val mode = Mode.values().firstOrNull { it.key == intent.getStringExtra("mode") }
+            ?: Mode.VISUAL
         vibrate()
 
         val col = LinearLayout(this).apply {
@@ -36,15 +39,15 @@ class BreakActivity : Activity() {
         }
 
         val title = TextView(this).apply {
-            text = "Hora de descansar"
+            text = "${mode.emoji}  ${mode.title}"
             textSize = 22f; setTextColor(0xFF9090B0.toInt()); gravity = Gravity.CENTER
         }
         val timer = TextView(this).apply {
-            textSize = 64f; setTextColor(0xFFE6E6FF.toInt()); gravity = Gravity.CENTER
+            textSize = 64f; setTextColor(mode.tint); gravity = Gravity.CENTER
             setTypeface(typeface, Typeface.BOLD)
         }
         val tip = TextView(this).apply {
-            text = Messages.random()
+            text = Messages.random(this@BreakActivity, mode)
             textSize = 18f; setTextColor(0xFFB8B8E0.toInt()); gravity = Gravity.CENTER
             setPadding(0, dp(24), 0, dp(32))
         }
@@ -55,8 +58,8 @@ class BreakActivity : Activity() {
         col.addView(tip)
 
         val snooze = pill("Posponer 5 min", 0xFF2A2A4A.toInt())
-        val skip = pill("Saltar", 0xFF3344AA.toInt())
-        snooze.setOnClickListener { Reminder.schedule(this, 5); finish() }
+        val skip = pill("Saltar", mode.tint)
+        snooze.setOnClickListener { Reminder.schedule(this, mode, 5); finish() }
         skip.setOnClickListener { finish() }
         col.addView(snooze)
         col.addView(space(dp(12)))
@@ -64,7 +67,7 @@ class BreakActivity : Activity() {
 
         setContentView(col)
 
-        var left = 20
+        var left = Reminder.breakSec(this, mode)
         val tick = object : Runnable {
             override fun run() {
                 if (left > 0) { timer.text = "$left"; left--; h.postDelayed(this, 1000) }
@@ -80,9 +83,9 @@ class BreakActivity : Activity() {
     }
 
     private fun vibrate() {
+        if (!Reminder.vibrates(this)) return
         val v = getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
-        if (Build.VERSION.SDK_INT >= 26)
-            v.vibrate(VibrationEffect.createOneShot(200, VibrationEffect.DEFAULT_AMPLITUDE))
+        v.vibrate(VibrationEffect.createOneShot(200, VibrationEffect.DEFAULT_AMPLITUDE))
     }
 
     private fun pill(label: String, color: Int) = Button(this).apply {
