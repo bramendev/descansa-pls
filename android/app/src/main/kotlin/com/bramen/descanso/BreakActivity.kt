@@ -16,6 +16,9 @@ import android.os.VibrationEffect
 import android.os.Vibrator
 import android.view.Gravity
 import android.view.View
+import android.view.View.SYSTEM_UI_FLAG_FULLSCREEN
+import android.view.View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+import android.view.View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
 import android.widget.Button
@@ -44,23 +47,17 @@ class BreakActivity : Activity() {
     }
 
     override fun onCreate(s: Bundle?) {
-        // Aplicar tema según configuración
-        val mode = Reminder.themeMode(this)
-        when (mode) {
-            "dark" -> setTheme(R.style.AppTheme_Dark_Fullscreen)
-            "light" -> setTheme(R.style.AppTheme_Fullscreen)
-            else -> {
-                val nightMode = resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK
-                if (nightMode == Configuration.UI_MODE_NIGHT_YES) {
-                    setTheme(R.style.AppTheme_Dark_Fullscreen)
-                } else {
-                    setTheme(R.style.AppTheme_Fullscreen)
-                }
-            }
-        }
-
         super.onCreate(s)
-        if (Build.VERSION.SDK_INT >= 27) { setShowWhenLocked(true); setTurnScreenOn(true) }
+        if (Build.VERSION.SDK_INT >= 27) { 
+            setShowWhenLocked(true); 
+            setTurnScreenOn(true)
+        }
+        // Fullscreen para BreakActivity
+        window.decorView.systemUiVisibility = (
+            View.SYSTEM_UI_FLAG_FULLSCREEN
+            or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+            or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+        )
 
         val mode = Mode.values().firstOrNull { it.key == intent.getStringExtra("mode") }
             ?: Mode.VISUAL

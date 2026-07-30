@@ -89,20 +89,6 @@ class MainActivity : Activity() {
     private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
 
     override fun onCreate(s: Bundle?) {
-        // Aplicar tema según configuración
-        val mode = themeModeSetting()
-        when (mode) {
-            "dark" -> setTheme(R.style.AppTheme_Dark)
-            "light" -> setTheme(R.style.AppTheme)
-            else -> {
-                val nightMode = resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK
-                if (nightMode == Configuration.UI_MODE_NIGHT_YES) {
-                    setTheme(R.style.AppTheme_Dark)
-                } else {
-                    setTheme(R.style.AppTheme)
-                }
-            }
-        }
         super.onCreate(s)
         updateColors()
         Reminder.ensurePermissions(this)
