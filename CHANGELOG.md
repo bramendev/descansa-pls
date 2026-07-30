@@ -4,6 +4,33 @@ Todas las versiones publicadas. Cada tag `v*` genera un
 [Release](https://github.com/bramendev/descansa-pls/releases) con el APK, y
 las notas salen de la sección correspondiente de este archivo.
 
+## v1.5 — 2026-07-30
+
+Mejora de usabilidad y experiencia en la app Android: notificaciones al final
+de las pausas y configuración rediseñada.
+
+### Mejoras
+
+- **Alertas al finalizar la pausa**: la pantalla de descanso ahora emite vibración
+  y sonido de notificación cuando el cronómetro llega a cero, además del cambio
+  visual (timer en verde, texto "¡Listo! Puedes continuar").
+- **Configuración reorganizada**: diálogo de ajustes rediseñado con secciones
+  claras (General, No molestar, Mensajes personalizados, Modos de recordatorio),
+  cada modo en su propia tarjeta visual con emoji y color distintivo.
+- **Divisores y espaciado**: separadores visuales entre secciones y mejor
+  distribución del espacio para mayor claridad.
+- **Validación de datos**: comprueba que duración e intervalos sean mayores a cero
+  antes de guardar, evitando configuraciones inválidas.
+- **Feedback al guardar**: toast de confirmación "✓ Configuración guardada" al
+  aplicar los cambios.
+
+### Cambios técnicos
+
+- `BreakActivity`: añade `playCompletionSound()` con `RingtoneManager` para sonido
+  de notificación del sistema; `vibrate()` ahora acepta parámetro de duración.
+- `MainActivity`: función `openSettings()` reescrita con estructura por secciones,
+  tarjetas para cada modo, divisores visuales y validación de datos.
+
 ## v1.4 — 2026-07-27
 
 Release grande de la app Android: cinco tipos de recordatorio, configuración
