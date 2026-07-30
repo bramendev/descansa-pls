@@ -45,14 +45,14 @@ class MainActivity : Activity() {
     private val lightAccent = 0xFF4466CC.toInt()
     private val lightGreen = 0xFF2E8B57.toInt()
     
-    // Colores actuales (se establecen en onCreate)
-    private lateinit var bg: Int
-    private lateinit var cardBg: Int
-    private lateinit var track: Int
-    private lateinit var primary: Int
-    private lateinit var muted: Int
-    private lateinit var accent: Int
-    private lateinit var green: Int
+    // Colores actuales (se sobrescriben en onCreate; lateinit no aplica a Int)
+    private var bg: Int = darkBg
+    private var cardBg: Int = darkCardBg
+    private var track: Int = darkTrack
+    private var primary: Int = darkPrimary
+    private var muted: Int = darkMuted
+    private var accent: Int = darkAccent
+    private var green: Int = darkGreen
     
     // Detector de modo oscuro
     private fun isDarkMode(): Boolean {
@@ -441,37 +441,40 @@ class MainActivity : Activity() {
                     return@pill
                 }
                 
-                // Obtener tema seleccionado
-                val themeRadioGroupChildren = themeRadioGroup.children
+                // Obtener tema seleccionado (los índices impares son los
+                // spacers entre checkboxes: dark=0, spacer=1, light=2, ...)
                 val selectedTheme = when {
-                    (themeRadioGroupChildren[0] as CheckBox).isChecked -> "dark"
-                    (themeRadioGroupChildren[1] as CheckBox).isChecked -> "light"
+                    (themeRadioGroup.getChildAt(0) as CheckBox).isChecked -> "dark"
+                    (themeRadioGroup.getChildAt(2) as CheckBox).isChecked -> "light"
                     else -> "auto"
                 }
-                
+
                 // Obtener animal seleccionado
-                val animalRadioGroupChildren = animalRadioGroup.children
                 val selectedAnimal = when {
-                    (animalRadioGroupChildren[0] as CheckBox).isChecked -> "perro"
+                    (animalRadioGroup.getChildAt(0) as CheckBox).isChecked -> "perro"
                     else -> "gato"
                 }
-                
-                Reminder.saveGlobal(this, vib.isChecked, status.isChecked,
+
+                // this dentro de este lambda hereda el receiver del LinearLayout.apply{}
+                // que lo envuelve (el onClick no tiene receiver propio) — hay que calificar
+                // explícitamente this@MainActivity para llegar al Context/Activity real.
+                Reminder.saveGlobal(this@MainActivity, vib.isChecked, status.isChecked,
                     qFrom.value, qTo.value, tips.text.toString(), selectedTheme, selectedAnimal)
                 for (m in Mode.values()) {
                     val atMin = times[m]?.let { it.hour * 60 + it.minute }
-                        ?: Reminder.dailyMin(this, m)
-                    Reminder.saveMode(this, m,
-                        on[m]?.isChecked ?: Reminder.isOn(this, m),
-                        every[m]?.value ?: Reminder.everyMin(this, m),
-                        secs[m]?.value ?: Reminder.breakSec(this, m),
+                        ?: Reminder.dailyMin(this@MainActivity, m)
+                    Reminder.saveMode(this@MainActivity, m,
+                        on[m]?.isChecked ?: Reminder.isOn(this@MainActivity, m),
+                        every[m]?.value ?: Reminder.everyMin(this@MainActivity, m),
+                        secs[m]?.value ?: Reminder.breakSec(this@MainActivity, m),
                         atMin)
                 }
                 // Reagenda para que los ajustes nuevos apliquen ya
-                if (!Reminder.isPaused(this)) Reminder.scheduleAll(this) else Reminder.status(this)
-                
+                if (!Reminder.isPaused(this@MainActivity)) Reminder.scheduleAll(this@MainActivity)
+                else Reminder.status(this@MainActivity)
+
                 // Feedback al usuario
-                Toast.makeText(this, "✓ Configuración guardada", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this@MainActivity, "✓ Configuración guardada", Toast.LENGTH_SHORT).show()
                 recreate()
             })
             addView(space(dp(16)))
