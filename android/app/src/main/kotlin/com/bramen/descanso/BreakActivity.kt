@@ -2,6 +2,7 @@ package com.bramen.descanso
 
 import android.app.Activity
 import android.content.Context
+import android.content.res.Configuration
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
@@ -24,6 +25,18 @@ import android.widget.TextView
 class BreakActivity : Activity() {
     private val h = Handler(Looper.getMainLooper())
     private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
+    
+    private fun isDarkMode(): Boolean {
+        val mode = Reminder.themeMode(this)
+        return when (mode) {
+            "light" -> false
+            "dark" -> true
+            else -> {
+                val nightMode = resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK
+                nightMode == Configuration.UI_MODE_NIGHT_YES
+            }
+        }
+    }
 
     override fun onCreate(s: Bundle?) {
         super.onCreate(s)
@@ -33,16 +46,21 @@ class BreakActivity : Activity() {
             ?: Mode.VISUAL
         vibrate()
 
+        val isDark = isDarkMode()
+        val bgColor = if (isDark) 0xFF0A0A1A.toInt() else 0xFFF8F9FA.toInt()
+        val textColor = if (isDark) 0xFFE0E0E0.toInt() else 0xFF1A1A1A.toInt()
+        val mutedColor = if (isDark) 0xFF8C8C8C.toInt() else 0xFF666666.toInt()
+        
         val col = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
-            setBackgroundColor(0xFF0A0A1A.toInt())
+            setBackgroundColor(bgColor)
             setPadding(dp(32), dp(32), dp(32), dp(32))
         }
 
         val title = TextView(this).apply {
             text = "${mode.emoji}  ${mode.title}"
-            textSize = 22f; setTextColor(0xFF9090B0.toInt()); gravity = Gravity.CENTER
+            textSize = 22f; setTextColor(mutedColor); gravity = Gravity.CENTER
         }
         val timer = TextView(this).apply {
             textSize = 64f; setTextColor(mode.tint); gravity = Gravity.CENTER
@@ -50,7 +68,7 @@ class BreakActivity : Activity() {
         }
         val tip = TextView(this).apply {
             text = Messages.random(this@BreakActivity, mode)
-            textSize = 18f; setTextColor(0xFFB8B8E0.toInt()); gravity = Gravity.CENTER
+            textSize = 18f; setTextColor(textColor); gravity = Gravity.CENTER
             setPadding(0, dp(24), 0, dp(32))
         }
 

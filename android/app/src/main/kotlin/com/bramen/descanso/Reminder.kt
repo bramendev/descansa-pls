@@ -75,15 +75,19 @@ object Reminder {
     fun quietFrom(ctx: Context) = prefs(ctx).getInt("quietFrom", 22)
     fun quietTo(ctx: Context) = prefs(ctx).getInt("quietTo", 8)
     fun customTips(ctx: Context) = prefs(ctx).getString("tips", "") ?: ""
+    
+    /** Modo de tema: "auto" (sigue sistema), "light" o "dark" */
+    fun themeMode(ctx: Context) = prefs(ctx).getString("theme", "auto") ?: "auto"
 
     fun saveGlobal(ctx: Context, vibrate: Boolean, status: Boolean,
-                   quietFrom: Int, quietTo: Int, tips: String) {
+                   quietFrom: Int, quietTo: Int, tips: String, theme: String = "auto") {
         prefs(ctx).edit()
             .putBoolean("vibrate", vibrate)
             .putBoolean("status", status)
             .putInt("quietFrom", quietFrom)
             .putInt("quietTo", quietTo)
             .putString("tips", tips)
+            .putString("theme", theme)
             .apply()
     }
 

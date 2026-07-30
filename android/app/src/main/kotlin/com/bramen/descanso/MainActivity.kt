@@ -2,6 +2,7 @@ package com.bramen.descanso
 
 import android.app.Activity
 import android.app.AlertDialog
+import android.content.res.Configuration
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
@@ -26,13 +27,61 @@ import java.time.LocalDate
 
 class MainActivity : Activity() {
 
-    private val bg = 0xFF0A0A1A.toInt()
-    private val cardBg = 0xFF16162E.toInt()
-    private val track = 0xFF23234A.toInt()
-    private val primary = 0xFFE6E6FF.toInt()
-    private val muted = 0xFF8C8CB0.toInt()
-    private val accent = 0xFF6E8CFF.toInt()
-    private val green = 0xFF6CE08C.toInt()
+    // Colores para modo oscuro
+    private val darkBg = 0xFF0A0A1A.toInt()
+    private val darkCardBg = 0xFF16162E.toInt()
+    private val darkTrack = 0xFF23234A.toInt()
+    private val darkPrimary = 0xFFE6E6FF.toInt()
+    private val darkMuted = 0xFF8C8CB0.toInt()
+    private val darkAccent = 0xFF6E8CFF.toInt()
+    private val darkGreen = 0xFF6CE08C.toInt()
+    
+    // Colores para modo claro
+    private val lightBg = 0xFFF8F9FA.toInt()
+    private val lightCardBg = 0xFFFFFFFF.toInt()
+    private val lightTrack = 0xFFE0E0E0.toInt()
+    private val lightPrimary = 0xFF1A1A1A.toInt()
+    private val lightMuted = 0xFF666666.toInt()
+    private val lightAccent = 0xFF4466CC.toInt()
+    private val lightGreen = 0xFF2E8B57.toInt()
+    
+    // Colores actuales (se establecen en onCreate)
+    private lateinit var bg: Int
+    private lateinit var cardBg: Int
+    private lateinit var track: Int
+    private lateinit var primary: Int
+    private lateinit var muted: Int
+    private lateinit var accent: Int
+    private lateinit var green: Int
+    
+    // Detector de modo oscuro
+    private fun isDarkMode(): Boolean {
+        val mode = themeModeSetting()
+        return when (mode) {
+            "light" -> false
+            "dark" -> true
+            else -> {
+                // auto: detectar modo del sistema
+                val nightMode = resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK
+                nightMode == Configuration.UI_MODE_NIGHT_YES
+            }
+        }
+    }
+    
+    private fun themeModeSetting(): String {
+        return Reminder.themeMode(this)
+    }
+    
+    private fun updateColors() {
+        val dark = isDarkMode()
+        bg = if (dark) darkBg else lightBg
+        cardBg = if (dark) darkCardBg else lightCardBg
+        track = if (dark) darkTrack else lightTrack
+        primary = if (dark) darkPrimary else lightPrimary
+        muted = if (dark) darkMuted else lightMuted
+        accent = if (dark) darkAccent else lightAccent
+        green = if (dark) darkGreen else lightGreen
+    }
 
     private val counters = ArrayList<Pair<Mode, TextView>>()
     private val h = Handler(Looper.getMainLooper())
@@ -41,6 +90,7 @@ class MainActivity : Activity() {
 
     override fun onCreate(s: Bundle?) {
         super.onCreate(s)
+        updateColors()
         Reminder.ensurePermissions(this)
         Reminder.ensureScheduled(this)
         val paused = Reminder.isPaused(this)
@@ -204,6 +254,27 @@ class MainActivity : Activity() {
             isChecked = Reminder.showStatus(this@MainActivity)
             setTextColor(primary)
         }
+        
+        // Selector de tema
+        val themeRadioGroup = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            val currentTheme = themeModeSetting()
+            
+            fun createRadio(text: String, value: String): CheckBox {
+                return CheckBox(this@MainActivity).apply {
+                    this.text = text
+                    isChecked = (currentTheme == value)
+                    setTextColor(primary)
+                }
+            }
+            
+            addView(createRadio("🌙  Oscuro", "dark"))
+            addView(space(dp(8)))
+            addView(createRadio("☀️  Claro", "light"))
+            addView(space(dp(8)))
+            addView(createRadio("🔄  Automático (sistema)", "auto"))
+        }
+        
         val qFrom = hourPicker(Reminder.quietFrom(this))
         val qTo = hourPicker(Reminder.quietTo(this))
         val tips = EditText(this).apply {
@@ -234,10 +305,20 @@ class MainActivity : Activity() {
             setPadding(dp(24), dp(8), dp(24), dp(24))
 
             // ============ SECCIÓN: GENERAL ============
-            addView(sectionHeader("🎵  General", accent))
+            addView(sectionHeader("🎨  Apariencia", accent))
+            addView(label("Tema de la app"))
+            addView(themeRadioGroup)
+            addView(space(dp(16)))
+            addView(divider())
+            addView(space(dp(16)))
+
+            // ============ SECCIÓN: NOTIFICACIONES ============
+            addView(sectionHeader("🎵  Notificaciones", accent))
             
             addView(vib)
             addView(status)
+            addView(space(dp(16)))
+            addView(divider())
             addView(space(dp(16)))
 
             // ============ SECCIÓN: NO MOLESTAR ============
@@ -290,19 +371,26 @@ class MainActivity : Activity() {
                 addView(modeSettingsCard(m, on, every, secs, times))
                 addView(space(dp(16)))
             }
-        }
-
-        AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
-            .setTitle("⚙  Configuración")
-            .setView(ScrollView(this).apply { addView(form) })
-            .setPositiveButton("Guardar") { _, _ ->
+            
+            // ============ BOTÓN GUARDAR AL FINAL ============
+            addView(divider())
+            addView(space(dp(24)))
+            addView(pill("✓ Guardar configuración") {
                 // Validar datos
                 if (!validateSettings(on, every, secs)) {
-                    return@setPositiveButton
+                    return@pill
+                }
+                
+                // Obtener tema seleccionado
+                val themeRadioGroupChildren = themeRadioGroup.children
+                val selectedTheme = when {
+                    (themeRadioGroupChildren[0] as CheckBox).isChecked -> "dark"
+                    (themeRadioGroupChildren[1] as CheckBox).isChecked -> "light"
+                    else -> "auto"
                 }
                 
                 Reminder.saveGlobal(this, vib.isChecked, status.isChecked,
-                    qFrom.value, qTo.value, tips.text.toString())
+                    qFrom.value, qTo.value, tips.text.toString(), selectedTheme)
                 for (m in Mode.values()) {
                     val atMin = times[m]?.let { it.hour * 60 + it.minute }
                         ?: Reminder.dailyMin(this, m)
@@ -318,7 +406,13 @@ class MainActivity : Activity() {
                 // Feedback al usuario
                 Toast.makeText(this, "✓ Configuración guardada", Toast.LENGTH_SHORT).show()
                 recreate()
-            }
+            })
+            addView(space(dp(16)))
+        }
+
+        AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
+            .setTitle("⚙  Configuración")
+            .setView(ScrollView(this).apply { addView(form) })
             .setNegativeButton("Cancelar", null)
             .show()
     }

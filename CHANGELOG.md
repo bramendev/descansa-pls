@@ -7,7 +7,7 @@ las notas salen de la sección correspondiente de este archivo.
 ## v1.5 — 2026-07-30
 
 Mejora de usabilidad y experiencia en la app Android: notificaciones al final
-de las pausas y configuración rediseñada.
+de las pausas, configuración rediseñada y soporte para modo oscuro.
 
 ### Mejoras
 
@@ -15,8 +15,14 @@ de las pausas y configuración rediseñada.
   y sonido de notificación cuando el cronómetro llega a cero, además del cambio
   visual (timer en verde, texto "¡Listo! Puedes continuar").
 - **Configuración reorganizada**: diálogo de ajustes rediseñado con secciones
-  claras (General, No molestar, Mensajes personalizados, Modos de recordatorio),
-  cada modo en su propia tarjeta visual con emoji y color distintivo.
+  claras (Apariencia, Notificaciones, No molestar, Mensajes personalizados,
+  Modos de recordatorio), cada modo en su propia tarjeta visual con emoji y
+  color distintivo.
+- **Soporte para modo oscuro**: la app ahora sigue el modo oscuro del sistema
+  automáticamente, con opción para forzar modo claro, oscuro o automático desde
+  la configuración (sección Apariencia).
+- **Botón guardar al final**: el botón "Guardar configuración" ahora está al final
+  del diálogo de ajustes para mayor comodidad.
 - **Divisores y espaciado**: separadores visuales entre secciones y mejor
   distribución del espacio para mayor claridad.
 - **Validación de datos**: comprueba que duración e intervalos sean mayores a cero
@@ -26,10 +32,15 @@ de las pausas y configuración rediseñada.
 
 ### Cambios técnicos
 
+- `AndroidManifest`: tema cambiado a `Theme.Material.DayNight.NoActionBar` para
+  soportar modo oscuro nativo.
+- `Reminder`: añade `themeMode()` para guardar/leer preferencia de tema.
 - `BreakActivity`: añade `playCompletionSound()` con `RingtoneManager` para sonido
-  de notificación del sistema; `vibrate()` ahora acepta parámetro de duración.
+  de notificación del sistema; `vibrate()` ahora acepta parámetro de duración;
+  colores adaptados al modo oscuro.
 - `MainActivity`: función `openSettings()` reescrita con estructura por secciones,
-  tarjetas para cada modo, divisores visuales y validación de datos.
+  tarjetas para cada modo, divisores visuales, validación de datos y selector de
+  tema (oscuro/clarom/auto).
 
 ## v1.4 — 2026-07-27
 
