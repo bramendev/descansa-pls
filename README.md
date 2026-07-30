@@ -28,10 +28,18 @@ El historial de versiones está en [CHANGELOG.md](CHANGELOG.md).
 
 Un solo script — corre directo desde la carpeta clonada, sin compilar nada.
 
+<table>
+<tr>
+<td><img src="screenshots/visual-perro-dark.png" width="260" alt="Descanso visual, tema oscuro, perro"></td>
+<td><img src="screenshots/visual-gato-dark.png" width="260" alt="Descanso visual, tema oscuro, gato"></td>
+<td><img src="screenshots/visual-perro-light.png" width="260" alt="Descanso visual, tema claro, perro"></td>
+</tr>
+</table>
+
 ### Características
 
 - **5 modos**: visual (20 min), activo (60 min), agua (30 min), almuerzo (12:00), dormir (22:30)
-- **Pixel art animado**: perro o gato en `sprites/<animal>/` con parpadeo y cola que se mueve entre cuadros; si no hay sprites, cae al ASCII art clásico
+- **Pixel art animado**: perro o gato en `sprites/<animal>/`, con un ciclo de caminata real de 4 cuadros; si no hay sprites, cae al ASCII art clásico
 - **Teclas**: Espacio saltar, Z snooze 5 min, Escape cerrar, Enter desbloquear
 - **Sonido**: beep al iniciar cada pausa (ffplay o winsound)
 - **Música lo-fi**: opcional durante las pausas
@@ -43,8 +51,21 @@ Un solo script — corre directo desde la carpeta clonada, sin compilar nada.
 
 ### Instalación
 
-Requiere **Python 3** (con `tkinter`, viene incluido) y opcionalmente
-`ffplay` (sonido/música).
+Requiere **Python 3.8+** con `tkinter`. En la mayoría de distros Linux viene
+aparte del intérprete base:
+
+```bash
+sudo dnf install python3-tkinter   # Fedora
+sudo apt install python3-tk        # Debian/Ubuntu
+```
+
+En macOS y Windows el instalador oficial de python.org ya lo incluye.
+
+No hay dependencias de pip — todo el script usa librería estándar
+(`tkinter`, `json`, `urllib`, etc.), así que no hace falta `requirements.txt`
+ni entorno virtual. La única dependencia opcional es un binario externo,
+**`ffplay`** (parte de [ffmpeg](https://ffmpeg.org)), para el beep y la
+música lo-fi; sin él la app funciona igual, solo sin sonido.
 
 ```bash
 git clone git@github.com:bramendev/descansa-pls.git
@@ -53,7 +74,11 @@ python3 descanso   # Linux/macOS
 python descanso    # Windows
 ```
 
-Eso es todo — sin copiar nada ni compilar nada.
+Eso es todo — sin copiar nada ni compilar nada. En el primer arranque se crea
+`~/.config/descanso-visual/config.json` con los valores por defecto (ver
+[Configuración](#configuración)); si quieres partir de una plantilla con
+comentarios, copiá `config.example.json` y `messages.example.json` del repo
+a esa carpeta antes de arrancar.
 
 #### Auto-inicio (opcional)
 
