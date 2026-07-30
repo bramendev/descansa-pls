@@ -80,11 +80,36 @@ Eso es todo — sin copiar nada ni compilar nada. En el primer arranque se crea
 comentarios, copiá `config.example.json` y `messages.example.json` del repo
 a esa carpeta antes de arrancar.
 
-#### Auto-inicio (opcional)
+#### Con uv (opcional)
 
-Si quieres que arranque solo con la sesión:
+Con [uv](https://docs.astral.sh/uv/) no hace falta instalar Python ni
+`tkinter` a mano: uv descarga un Python autocontenido (con Tk incluido) la
+primera vez que corrés el script, y como el proyecto no tiene dependencias
+de pip, no hay nada más que resolver.
 
-- **Linux (systemd):**
+```bash
+# instalar uv, una sola vez
+curl -LsSf https://astral.sh/uv/install.sh | sh                      # Linux/macOS
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"  # Windows
+
+git clone git@github.com:bramendev/descansa-pls.git
+cd descansa-pls
+uv run python3 descanso   # Linux/macOS
+uv run python descanso    # Windows
+```
+
+Cualquier comando de este README que empiece con `python3`/`python` funciona
+igual anteponiendo `uv run` — incluido el auto-inicio de más abajo.
+
+#### Auto-inicio y persistencia (opcional)
+
+La app no es un servicio en segundo plano sin interfaz: la pausa es una
+ventana de tkinter, así que necesita una sesión gráfica activa para
+mostrarse. "Dejarla corriendo siempre" en la práctica significa que arranque
+sola cada vez que iniciás sesión, sin que tengas que acordarte — sobrevive
+apagados y reinicios porque se relanza sola en cada login.
+
+- **Linux (systemd, recomendado):**
   ```bash
   cp descanso ~/.local/bin/
   cp pantalla-descanso ~/.local/bin/
@@ -94,8 +119,32 @@ Si quieres que arranque solo con la sesión:
   systemctl --user enable --now descanso
   journalctl --user -u descanso -f   # logs
   ```
-- **Windows:** `Win+R` → `shell:startup` → acceso directo apuntando a
-  `pythonw.exe C:\ruta\a\descansa-pls\descanso`.
+  `Restart=on-failure` en `descanso.service` ya hace que se relance solo si
+  el proceso muere. Si querés que arranque apenas enciende el equipo, incluso
+  antes de iniciar sesión gráficamente (por ejemplo con auto-login), activá
+  linger una vez: `loginctl enable-linger $USER`.
+
+  Para usar el Python de uv en lugar del Python del sistema, cambiá la línea
+  `ExecStart` de `descanso.service` por:
+  ```ini
+  ExecStart=/home/TU_USUARIO/.local/bin/uv run python3 /home/TU_USUARIO/.local/bin/descanso
+  ```
+
+- **Windows (Programador de tareas, recomendado sobre la carpeta de inicio
+  porque reintenta solo si falla):**
+  1. Abrí **Programador de tareas** → *Crear tarea básica*.
+  2. Desencadenador: **Al iniciar sesión**.
+  3. Acción: **Iniciar un programa**, con estos tres campos:
+     | Campo | Sin uv | Con uv |
+     |---|---|---|
+     | Programa/script | `pythonw.exe` | ruta a `uv.exe` |
+     | Argumentos | `descanso` | `run python descanso` |
+     | Iniciar en | `C:\ruta\a\descansa-pls` | `C:\ruta\a\descansa-pls` |
+  4. En **Configuración**, marcá *"Si la tarea falla, reiniciar cada:"* y
+     poné 1 minuto, para que se recupere sola si se cierra.
+
+  Alternativa rápida y sin reintentos: `Win+R` → `shell:startup` → acceso
+  directo apuntando a `pythonw.exe C:\ruta\a\descansa-pls\descanso`.
 
 ### Controles en pantalla
 
