@@ -31,7 +31,7 @@
             android:excludeFromRecents="true"
             android:showWhenLocked="true"
             android:turnScreenOn="true"
-            android:theme="@android:style/Theme.Material.Light.NoActionBar">
+            android:theme="@android:style/Theme.Material.Light.NoActionBar"/>
 
         <receiver android:name=".BreakReceiver" android:exported="false"/>
 
