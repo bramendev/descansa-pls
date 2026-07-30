@@ -7,7 +7,33 @@ las notas salen de la sección correspondiente de este archivo.
 ## v1.6 — 2026-07-30
 
 Mejora de usabilidad y experiencia en la app Android: notificaciones al final
-de las pausas, configuración rediseñada, modo oscuro y animación de animal.
+de las pausas, configuración rediseñada, modo oscuro, animación de animal y temas personalizables.
+
+### Mejoras
+
+- **Alertas al finalizar la pausa**: vibración y sonido cuando el cronómetro
+  llega a cero, con cambio visual (timer en verde, "¡Listo! Puedes continuar").
+- **Animación de animal**: pantalla de pausa muestra perro o gato caminando en
+  frames animados (como en escritorio). Seleccionable en Configuración → Apariencia.
+- **Configuración reorganizada**: diálogo de ajustes con secciones claras
+  (Apariencia, Notificaciones, No molestar, Mensajes, Modos).
+- **Soporte para modo oscuro**: sigue el modo del sistema automáticamente,
+  con opción para forzar claro/oscuro/auto en Configuración.
+- **Botón guardar al final**: ahora está al final del diálogo de ajustes.
+- **Pantalla inicial simplificada**: diseño más limpio con secciones:
+  estado, próximo descanso, modos activos, estadísticas.
+- **Estadísticas en pantalla de pausa**: muestra racha, hoy, semana, total.
+- **Validación de datos**: comprueba duración e intervalos > 0.
+- **Feedback al guardar**: toast "✓ Configuración guardada".
+
+### Cambios técnicos
+
+- `AndroidManifest`: temas personalizados `AppTheme` y `AppTheme.Fullscreen`
+  con soporte para modo oscuro vía `values-night/themes.xml`.
+- `Reminder`: añade `themeMode()`, `animal()`; `saveGlobal()` actualizada.
+- `BreakActivity`: animación de frames, `vibrateEnd()`, estadísticas, colores adaptados.
+- `MainActivity`: configuración reorganizada, pantalla inicial simplificada.
+- **Recursos**: añadidos `dog_frame0-3.png`, `cat_frame0-3.png`, `values/themes.xml`, `values-night/themes.xml`.
 
 ### Mejoras
 

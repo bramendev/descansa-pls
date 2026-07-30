@@ -44,6 +44,21 @@ class BreakActivity : Activity() {
     }
 
     override fun onCreate(s: Bundle?) {
+        // Aplicar tema según configuración
+        val mode = Reminder.themeMode(this)
+        when (mode) {
+            "dark" -> setTheme(R.style.AppTheme_Dark_Fullscreen)
+            "light" -> setTheme(R.style.AppTheme_Fullscreen)
+            else -> {
+                val nightMode = resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK
+                if (nightMode == Configuration.UI_MODE_NIGHT_YES) {
+                    setTheme(R.style.AppTheme_Dark_Fullscreen)
+                } else {
+                    setTheme(R.style.AppTheme_Fullscreen)
+                }
+            }
+        }
+
         super.onCreate(s)
         if (Build.VERSION.SDK_INT >= 27) { setShowWhenLocked(true); setTurnScreenOn(true) }
 

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="AppTheme" parent="Theme.Material.Light.NoActionBar">
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+    
+    <style name="AppTheme.Fullscreen" parent="Theme.Material.NoActionBar.Fullscreen">
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+    
+    <!-- Tema oscuro -->
+    <style name="AppTheme.Dark" parent="Theme.Material.NoActionBar">
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:colorBackground">#FF0A0A1A</item>
+    </style>
+    
+    <style name="AppTheme.Dark.Fullscreen" parent="Theme.Material.NoActionBar.Fullscreen">
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:colorBackground">#FF0A0A1A</item>
+    </style>
+</resources>

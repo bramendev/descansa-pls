@@ -82,13 +82,27 @@ class MainActivity : Activity() {
         accent = if (dark) darkAccent else lightAccent
         green = if (dark) darkGreen else lightGreen
     }
-
+    
     private val counters = ArrayList<Pair<Mode, TextView>>()
     private val h = Handler(Looper.getMainLooper())
 
     private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
 
     override fun onCreate(s: Bundle?) {
+        // Aplicar tema según configuración
+        val mode = themeModeSetting()
+        when (mode) {
+            "dark" -> setTheme(R.style.AppTheme_Dark)
+            "light" -> setTheme(R.style.AppTheme)
+            else -> {
+                val nightMode = resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK
+                if (nightMode == Configuration.UI_MODE_NIGHT_YES) {
+                    setTheme(R.style.AppTheme_Dark)
+                } else {
+                    setTheme(R.style.AppTheme)
+                }
+            }
+        }
         super.onCreate(s)
         updateColors()
         Reminder.ensurePermissions(this)
