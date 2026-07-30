@@ -202,37 +202,42 @@ _DOG_ROW7 = " ===/___) ||"
 _DOG_EYES_OPEN = "      / o o \\"
 _DOG_EYES_BLINK = "      / - - \\"
 
-# la cola real es el "(" de la esquina inferior izquierda: menea subiendo a la
-# fila 5 (arriba) o bajando a la 6 (abajo). El cuerpo "===/___)" queda fijo.
-_DOG_R5_UP = "(     /    |"
-_DOG_R5_DOWN = "      /    |"
-_DOG_R6_UP = "     /     |"
-_DOG_R6_DOWN = "(    /     |"
+# la cola sube poco a poco con curva: "(" es la punta, "\" la une al cuerpo.
+# DOWN: recta a ras del cuerpo. RISING: punta sube a fila 6. UP: punta arriba
+# con "\" curvando hacia los "===".
+_DOG_TAIL_DOWN = ("      /    |", "     /     |", "(===/___) ||")
+_DOG_TAIL_RISING = ("      /    |", "(    /     |", " ===/___) ||")
+_DOG_TAIL_UP = ("(     /    |", " \\   /     |", " ===/___) ||")
 
-def _dog_frame(eyes, tail_up):
-    r5 = _DOG_R5_UP if tail_up else _DOG_R5_DOWN
-    r6 = _DOG_R6_UP if tail_up else _DOG_R6_DOWN
+def _dog_frame(eyes, tail):
+    r5, r6, r7 = tail
     return "\n".join([_DOG_EARS, eyes, _DOG_ROW2, _DOG_ROW3, _DOG_ROW4,
-                       r5, r6, _DOG_ROW7])
+                       r5, r6, r7])
 
 _DOG = [
-    _dog_frame(_DOG_EYES_OPEN, False),
-    _dog_frame(_DOG_EYES_OPEN, True),
-    _dog_frame(_DOG_EYES_OPEN, False),
-    _dog_frame(_DOG_EYES_OPEN, True),
-    _dog_frame(_DOG_EYES_BLINK, False),
-    _dog_frame(_DOG_EYES_OPEN, True),
-    _dog_frame(_DOG_EYES_OPEN, False),
-    _dog_frame(_DOG_EYES_OPEN, True),
+    _dog_frame(_DOG_EYES_OPEN, _DOG_TAIL_DOWN),
+    _dog_frame(_DOG_EYES_OPEN, _DOG_TAIL_RISING),
+    _dog_frame(_DOG_EYES_OPEN, _DOG_TAIL_UP),
+    _dog_frame(_DOG_EYES_BLINK, _DOG_TAIL_UP),
+    _dog_frame(_DOG_EYES_OPEN, _DOG_TAIL_UP),
+    _dog_frame(_DOG_EYES_OPEN, _DOG_TAIL_RISING),
+    _dog_frame(_DOG_EYES_OPEN, _DOG_TAIL_DOWN),
+    _dog_frame(_DOG_EYES_OPEN, _DOG_TAIL_DOWN),
 ]
 
 _CAT_OPEN = " /\\_/\\\n( o.o )\n > ^ <"
 _CAT_BLINK = " /\\_/\\\n( -.- )\n > ^ <"
 _CAT = [_CAT_OPEN] * 5 + [_CAT_BLINK] + [_CAT_OPEN] * 2
 
-FRAMES = _DOG if ANIMAL not in ('gato', 'cat', 'g') else _CAT
+ES_GATO = ANIMAL in ('gato', 'cat', 'g')
+FRAMES = _CAT if ES_GATO else _DOG
 # el canvas se dimensiona con FRAMES[0]: todos los cuadros deben medir igual.
 assert len({f.count('\n') for f in FRAMES}) == 1
+
+# pixel art: si hay PNGs en sprites/<animal>/ se usan y se ciclan; si no, ASCII.
+# (cualquier sprite animado soltado aquí funciona sin tocar código)
+SPRITES_DIR = Path(__file__).resolve().parent / 'sprites' / ('gato' if ES_GATO else 'perro')
+SPRITE_PNGS = sorted(SPRITES_DIR.glob('*.png')) if SPRITES_DIR.is_dir() else []
 
 _CURIOSIDADES = ([
     "Los pulpos tienen tres corazones y su sangre es azul.",
@@ -497,16 +502,23 @@ class PantallaDescanso:
                 text=WEATHER).pack()
 
         if TIENE_TIMER:
-            self.animal_font = font.Font(family=MONO, size=14)
-            n_lines = len(FRAMES[0].split('\n'))
-            line_h = self.animal_font.metrics('linespace')
-            canvas_w = max(self.animal_font.measure(l)
-                           for fr in FRAMES for l in fr.split('\n')) + 10
-            canvas_h = line_h * n_lines + 10
-            self.canvas_animal = tk.Canvas(f, bg=T['bg'], highlightthickness=0,
-                width=canvas_w, height=canvas_h)
-            self.canvas_animal.pack(pady=(20,0))
-            self._render_animal_frame(0)
+            if SPRITE_PNGS:
+                self.sprite_imgs = [tk.PhotoImage(file=str(p)).zoom(3)
+                                    for p in SPRITE_PNGS]
+                self.label_animal = tk.Label(f, image=self.sprite_imgs[0],
+                    bg=T['bg'], bd=0)
+                self.label_animal.pack(pady=(20, 0))
+            else:
+                self.animal_font = font.Font(family=MONO, size=14)
+                n_lines = len(FRAMES[0].split('\n'))
+                line_h = self.animal_font.metrics('linespace')
+                canvas_w = max(self.animal_font.measure(l)
+                               for fr in FRAMES for l in fr.split('\n')) + 10
+                canvas_h = line_h * n_lines + 10
+                self.canvas_animal = tk.Canvas(f, bg=T['bg'], highlightthickness=0,
+                    width=canvas_w, height=canvas_h)
+                self.canvas_animal.pack(pady=(20,0))
+                self._render_animal_frame(0)
 
             self.label_timer = tk.Label(f, bg=T['bg'], fg=T['timer'],
                 font=(SANS, 22))
@@ -593,6 +605,9 @@ class PantallaDescanso:
         self.root.after(1000, self._tick)
 
     def _render_animal_frame(self, idx):
+        if SPRITE_PNGS:
+            self.label_animal.config(image=self.sprite_imgs[idx % len(self.sprite_imgs)])
+            return
         self.canvas_animal.delete("all")
         self.canvas_animal.create_text(
             self.canvas_animal.winfo_reqwidth() // 2,
@@ -601,7 +616,7 @@ class PantallaDescanso:
             anchor='center', justify='left')
 
     def _animar(self):
-        n = len(FRAMES)
+        n = len(self.sprite_imgs) if SPRITE_PNGS else len(FRAMES)
         self.frame_idx = (self.frame_idx + 1) % n
         self._render_animal_frame(self.frame_idx)
         self.root.after(500, self._animar)

@@ -31,7 +31,7 @@ Un solo script — corre directo desde la carpeta clonada, sin compilar nada.
 ### Características
 
 - **5 modos**: visual (20 min), activo (60 min), agua (30 min), almuerzo (12:00), dormir (22:30)
-- **ASCII art animado**: perro o gato con animaciones
+- **Pixel art animado**: perro o gato en `sprites/<animal>/` con parpadeo y cola que se mueve entre cuadros; si no hay sprites, cae al ASCII art clásico
 - **Teclas**: Espacio saltar, Z snooze 5 min, Escape cerrar, Enter desbloquear
 - **Sonido**: beep al iniciar cada pausa (ffplay o winsound)
 - **Música lo-fi**: opcional durante las pausas
@@ -63,6 +63,7 @@ Si quieres que arranque solo con la sesión:
   ```bash
   cp descanso ~/.local/bin/
   cp pantalla-descanso ~/.local/bin/
+  cp -r sprites ~/.local/bin/        # pixel art (opcional; sin esto usa ASCII)
   cp descanso.service ~/.config/systemd/user/
   systemctl --user daemon-reload
   systemctl --user enable --now descanso
