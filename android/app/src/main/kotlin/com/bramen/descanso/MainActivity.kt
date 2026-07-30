@@ -99,39 +99,78 @@ class MainActivity : Activity() {
         val col = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(bg)
-            setPadding(dp(24), dp(32), dp(24), dp(32))
+            setPadding(dp(20), dp(24), dp(20), dp(24))
         }
 
+        // ============ HEADER ============
         col.addView(topBar())
-        col.addView(text("Descanso", 32, primary, Gravity.CENTER, bold = true))
-        col.addView(text("Cuida tus ojos · muévete · hidrátate", 14, muted, Gravity.CENTER))
+        col.addView(space(dp(12)))
+        
+        col.addView(TextView(this).apply {
+            text = "Descanso"
+            textSize = 32f
+            setTextColor(primary)
+            gravity = Gravity.CENTER
+            setTypeface(typeface, Typeface.BOLD)
+        })
+        col.addView(TextView(this).apply {
+            text = "Cuida tus ojos · muévete · hidrátate"
+            textSize = 14f
+            setTextColor(muted)
+            gravity = Gravity.CENTER
+        })
         col.addView(space(dp(24)))
 
+        // ============ ESTADO (Pausado/Activo) ============
         col.addView(card(
             if (paused) "⏸ Pausado" else "● Activo",
             if (paused) muted else green,
             body(if (paused) "Los recordatorios están en pausa."
                  else "Te avisaré automáticamente,\naunque cierres la app.", 15, muted)))
-        col.addView(space(dp(14)))
+        col.addView(space(dp(16)))
 
+        // ============ PRÓXIMO DESCANSO ============
+        val nextMode = Reminder.soonest(this)
+        if (nextMode != null) {
+            val nextTime = Reminder.nextAt(this, nextMode)
+            val eta = if (nextTime > 0) eta(nextTime) else "pronto"
+            col.addView(card("🎯 Próximo: ${nextMode.emoji} ${nextMode.title}", nextMode.tint,
+                body("En: $eta", 18, primary, bold = true)))
+            col.addView(space(dp(16)))
+        }
+
+        // ============ MODOS ACTIVOS ============
         val activos = Mode.values().filter { Reminder.isOn(this, it) }
-        if (activos.isEmpty()) {
-            col.addView(card("SIN RECORDATORIOS", muted,
-                body("Activa alguno desde ⚙ Configuración.", 15, muted)))
-            col.addView(space(dp(14)))
-        }
-        for (m in activos) {
-            col.addView(modeCard(m))
-            col.addView(space(dp(14)))
+        if (activos.isNotEmpty()) {
+            val activeLabels = activos.joinToString(" · ") { "${it.emoji}" }
+            col.addView(card("📋 Modos activos", accent,
+                body(activeLabels, 16, primary)))
+            col.addView(space(dp(16)))
         }
 
-        col.addView(card("ESTADÍSTICAS", accent, statsBody()))
+        // ============ ESTADÍSTICAS ============
+        val todayCount = Reminder.todayCount(this)
+        val totalCount = Reminder.totalCount(this)
+        val streak = Reminder.streak(this)
+        val weekCount = Reminder.weekDays(this).sum()
+        
+        val statsText = when {
+            streak > 0 && todayCount > 0 -> "🔥 $streak días  •  Hoy: $todayCount  •  Semana: $weekCount  •  Total: $totalCount"
+            streak > 0 -> "🔥 $streak días  •  Semana: $weekCount  •  Total: $totalCount"
+            todayCount > 0 -> "Hoy: $todayCount  •  Semana: $weekCount  •  Total: $totalCount"
+            else -> "Semana: $weekCount  •  Total: $totalCount"
+        }
+        
+        col.addView(card("📊 Estadísticas", accent,
+            body(statsText, 16, primary)))
         col.addView(space(dp(24)))
 
-        col.addView(pill(if (paused) "Reanudar" else "Pausar recordatorios") {
+        // ============ BOTÓN PAUSAR/REAUDAR ============
+        col.addView(pill(if (paused) "▶ Reanudar" else "⏸ Pausar") {
             if (Reminder.isPaused(this)) Reminder.resume(this) else Reminder.pause(this)
             recreate()
         })
+        col.addView(space(dp(16)))
 
         setContentView(ScrollView(this).apply { setBackgroundColor(bg); addView(col) })
     }
@@ -275,6 +314,24 @@ class MainActivity : Activity() {
             addView(createRadio("🔄  Automático (sistema)", "auto"))
         }
         
+        // Selector de animal
+        val animalRadioGroup = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            val currentAnimal = Reminder.animal(this@MainActivity)
+            
+            fun createAnimalRadio(text: String, value: String): CheckBox {
+                return CheckBox(this@MainActivity).apply {
+                    this.text = text
+                    isChecked = (currentAnimal == value)
+                    setTextColor(primary)
+                }
+            }
+            
+            addView(createAnimalRadio("🐕 Perro", "perro"))
+            addView(space(dp(8)))
+            addView(createAnimalRadio("🐈 Gato", "gato"))
+        }
+        
         val qFrom = hourPicker(Reminder.quietFrom(this))
         val qTo = hourPicker(Reminder.quietTo(this))
         val tips = EditText(this).apply {
@@ -308,6 +365,9 @@ class MainActivity : Activity() {
             addView(sectionHeader("🎨  Apariencia", accent))
             addView(label("Tema de la app"))
             addView(themeRadioGroup)
+            addView(space(dp(16)))
+            addView(label("Animal de la animación"))
+            addView(animalRadioGroup)
             addView(space(dp(16)))
             addView(divider())
             addView(space(dp(16)))
@@ -389,8 +449,15 @@ class MainActivity : Activity() {
                     else -> "auto"
                 }
                 
+                // Obtener animal seleccionado
+                val animalRadioGroupChildren = animalRadioGroup.children
+                val selectedAnimal = when {
+                    (animalRadioGroupChildren[0] as CheckBox).isChecked -> "perro"
+                    else -> "gato"
+                }
+                
                 Reminder.saveGlobal(this, vib.isChecked, status.isChecked,
-                    qFrom.value, qTo.value, tips.text.toString(), selectedTheme)
+                    qFrom.value, qTo.value, tips.text.toString(), selectedTheme, selectedAnimal)
                 for (m in Mode.values()) {
                     val atMin = times[m]?.let { it.hour * 60 + it.minute }
                         ?: Reminder.dailyMin(this, m)

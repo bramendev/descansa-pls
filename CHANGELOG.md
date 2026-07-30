@@ -7,40 +7,32 @@ las notas salen de la sección correspondiente de este archivo.
 ## v1.5 — 2026-07-30
 
 Mejora de usabilidad y experiencia en la app Android: notificaciones al final
-de las pausas, configuración rediseñada y soporte para modo oscuro.
+de las pausas, configuración rediseñada, modo oscuro y animación de animal.
 
 ### Mejoras
 
-- **Alertas al finalizar la pausa**: la pantalla de descanso ahora emite vibración
-  y sonido de notificación cuando el cronómetro llega a cero, además del cambio
-  visual (timer en verde, texto "¡Listo! Puedes continuar").
-- **Configuración reorganizada**: diálogo de ajustes rediseñado con secciones
-  claras (Apariencia, Notificaciones, No molestar, Mensajes personalizados,
-  Modos de recordatorio), cada modo en su propia tarjeta visual con emoji y
-  color distintivo.
-- **Soporte para modo oscuro**: la app ahora sigue el modo oscuro del sistema
-  automáticamente, con opción para forzar modo claro, oscuro o automático desde
-  la configuración (sección Apariencia).
-- **Botón guardar al final**: el botón "Guardar configuración" ahora está al final
-  del diálogo de ajustes para mayor comodidad.
-- **Divisores y espaciado**: separadores visuales entre secciones y mejor
-  distribución del espacio para mayor claridad.
-- **Validación de datos**: comprueba que duración e intervalos sean mayores a cero
-  antes de guardar, evitando configuraciones inválidas.
-- **Feedback al guardar**: toast de confirmación "✓ Configuración guardada" al
-  aplicar los cambios.
+- **Alertas al finalizar la pausa**: vibración y sonido cuando el cronómetro
+  llega a cero, con cambio visual (timer en verde, "¡Listo! Puedes continuar").
+- **Animación de animal**: pantalla de pausa muestra perro o gato caminando en
+  frames animados (como en escritorio). Seleccionable en Configuración → Apariencia.
+- **Configuración reorganizada**: diálogo de ajustes con secciones claras
+  (Apariencia, Notificaciones, No molestar, Mensajes, Modos).
+- **Soporte para modo oscuro**: sigue el modo del sistema automáticamente,
+  con opción para forzar claro/oscuro/auto en Configuración.
+- **Botón guardar al final**: ahora está al final del diálogo de ajustes.
+- **Pantalla inicial simplificada**: diseño más limpio con secciones:
+  estado, próximo descanso, modos activos, estadísticas.
+- **Estadísticas en pantalla de pausa**: muestra racha, hoy, semana, total.
+- **Validación de datos**: comprueba duración e intervalos > 0.
+- **Feedback al guardar**: toast "✓ Configuración guardada".
 
 ### Cambios técnicos
 
-- `AndroidManifest`: tema cambiado a `Theme.Material.DayNight.NoActionBar` para
-  soportar modo oscuro nativo.
-- `Reminder`: añade `themeMode()` para guardar/leer preferencia de tema.
-- `BreakActivity`: añade `playCompletionSound()` con `RingtoneManager` para sonido
-  de notificación del sistema; `vibrate()` ahora acepta parámetro de duración;
-  colores adaptados al modo oscuro.
-- `MainActivity`: función `openSettings()` reescrita con estructura por secciones,
-  tarjetas para cada modo, divisores visuales, validación de datos y selector de
-  tema (oscuro/clarom/auto).
+- `AndroidManifest`: tema `Theme.Material.DayNight.NoActionBar` para modo oscuro.
+- `Reminder`: añade `themeMode()`, `animal()`; `saveGlobal()` actualizada.
+- `BreakActivity`: animación de frames, `vibrateEnd()`, estadísticas, colores adaptados.
+- `MainActivity`: configuración reorganizada, pantalla inicial simplificada.
+- **Recursos**: añadidos `dog_frame0-3.png` y `cat_frame0-3.png`.
 
 ## v1.4 — 2026-07-27
 

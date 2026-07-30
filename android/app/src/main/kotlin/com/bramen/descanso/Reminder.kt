@@ -78,9 +78,12 @@ object Reminder {
     
     /** Modo de tema: "auto" (sigue sistema), "light" o "dark" */
     fun themeMode(ctx: Context) = prefs(ctx).getString("theme", "auto") ?: "auto"
+    
+    /** Animal para la animación: "perro" o "gato" */
+    fun animal(ctx: Context) = prefs(ctx).getString("animal", "perro") ?: "perro"
 
     fun saveGlobal(ctx: Context, vibrate: Boolean, status: Boolean,
-                   quietFrom: Int, quietTo: Int, tips: String, theme: String = "auto") {
+                   quietFrom: Int, quietTo: Int, tips: String, theme: String = "auto", animal: String = "perro") {
         prefs(ctx).edit()
             .putBoolean("vibrate", vibrate)
             .putBoolean("status", status)
@@ -88,6 +91,7 @@ object Reminder {
             .putInt("quietTo", quietTo)
             .putString("tips", tips)
             .putString("theme", theme)
+            .putString("animal", animal)
             .apply()
     }
 
