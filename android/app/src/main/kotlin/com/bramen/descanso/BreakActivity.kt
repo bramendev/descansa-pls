@@ -59,16 +59,16 @@ class BreakActivity : Activity() {
             or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
         )
 
-        val mode = Mode.values().firstOrNull { it.key == intent.getStringExtra("mode") }
-            ?: Mode.VISUAL
-        
-        // Inicializar frames del animal
+        // Inicializar frames del animal al inicio
         val animal = Reminder.animal(this)
         animalFrames = if (animal == "gato" || animal == "cat") {
             listOf(R.drawable.cat_frame0, R.drawable.cat_frame1, R.drawable.cat_frame2, R.drawable.cat_frame3)
         } else {
             listOf(R.drawable.dog_frame0, R.drawable.dog_frame1, R.drawable.dog_frame2, R.drawable.dog_frame3)
         }
+
+        val mode = Mode.values().firstOrNull { it.key == intent.getStringExtra("mode") }
+            ?: Mode.VISUAL
         
         // Vibración y sonido al abrir
         vibrate()
@@ -100,27 +100,16 @@ class BreakActivity : Activity() {
         col.addView(space(dp(16)))
         
         // ========== ANIMAL ANIMADO ==========
-        // Intentar cargar sprites si existen
-        val animalName = Reminder.animal(this) // Necesitamos añadir esta función
-        val hasSprites = try {
-            val resId = resources.getIdentifier("frame0", "drawable", packageName)
-            resId != 0
-        } catch (e: Exception) {
-            false
+        // Crear ImageView y mostrar primer frame
+        animalImage = ImageView(this).apply {
+            setImageResource(animalFrames[0])
+            layoutParams = LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT)
         }
+        col.addView(animalImage)
+        col.addView(space(dp(24)))
         
-        if (hasSprites) {
-            animalImage = ImageView(this).apply {
-                // Cargar frame inicial
-                setImageResource(R.drawable.frame0)
-                layoutParams = LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT)
-            }
-            col.addView(animalImage)
-            col.addView(space(dp(24)))
-            
-            // Iniciar animación
-            h.postDelayed({ animateAnimal() }, 300)
-        }
+        // Iniciar animación
+        h.postDelayed({ animateAnimal() }, 300)
         
         // ========== TIMER ==========
         val timer = TextView(this).apply {
