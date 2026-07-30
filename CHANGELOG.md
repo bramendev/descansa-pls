@@ -4,7 +4,7 @@ Todas las versiones publicadas. Cada tag `v*` genera un
 [Release](https://github.com/bramendev/descansa-pls/releases) con el APK, y
 las notas salen de la sección correspondiente de este archivo.
 
-## v1.5 — 2026-07-30
+## v1.6 — 2026-07-30
 
 Mejora de usabilidad y experiencia en la app Android: notificaciones al final
 de las pausas, configuración rediseñada, modo oscuro y animación de animal.
