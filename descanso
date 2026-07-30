@@ -282,6 +282,7 @@ def main():
     next_water = time.time() + wi
     last_lunch_date = None
     last_sleep_date = None
+    last_tick = time.time()
 
     animal = config['animal']
     music = config['music_url']
@@ -316,6 +317,14 @@ def main():
     while True:
         now = datetime.now()
         hoy = now.date()
+        now_t = time.time()
+        # ponytail: si el proceso estuvo congelado (lid closed/suspend),
+        # reiniciamos los timers en vez de disparar todo lo acumulado.
+        if now_t - last_tick > 30:
+            next_visual = now_t + vi
+            next_active = now_t + ai
+            next_water = now_t + wi
+        last_tick = now_t
 
         if weather_city and time.time() >= next_weather_check:
             weather = get_weather(weather_city)
