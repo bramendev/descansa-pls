@@ -83,7 +83,7 @@ class MainActivity : Activity() {
         green = if (dark) darkGreen else lightGreen
     }
     
-    private val counters = ArrayList<Pair<Mode, TextView>>()
+    private val counters = ArrayList<() -> Unit>()
     private val h = Handler(Looper.getMainLooper())
 
     private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
@@ -133,9 +133,10 @@ class MainActivity : Activity() {
         val nextMode = Reminder.soonest(this)
         if (nextMode != null) {
             val nextTime = Reminder.nextAt(this, nextMode)
-            val eta = if (nextTime > 0) eta(nextTime) else "pronto"
-            col.addView(card("🎯 Próximo: ${nextMode.emoji} ${nextMode.title}", nextMode.tint,
-                body("En: $eta", 18, primary, bold = true)))
+            val etaView = body("En: ${if (nextTime > 0) eta(nextTime) else "pronto"}", 18, primary, bold = true)
+            // sin esto el texto queda fijo en el valor de onCreate: nunca baja.
+            counters.add { etaView.text = "En: ${eta(Reminder.nextAt(this, nextMode))}" }
+            col.addView(card("🎯 Próximo: ${nextMode.emoji} ${nextMode.title}", nextMode.tint, etaView))
             col.addView(space(dp(16)))
         }
 
@@ -181,7 +182,7 @@ class MainActivity : Activity() {
     override fun onPause() { super.onPause(); h.removeCallbacksAndMessages(null) }
 
     private fun tick() {
-        for ((m, tv) in counters) tv.text = eta(Reminder.nextAt(this, m))
+        for (update in counters) update()
         h.postDelayed(::tick, 1000)
     }
 
@@ -197,7 +198,7 @@ class MainActivity : Activity() {
 
     private fun modeCard(m: Mode): View {
         val cd = body("—", 30, primary, bold = true)
-        counters.add(m to cd)
+        counters.add { cd.text = eta(Reminder.nextAt(this, m)) }
         val cadencia = if (m.isDaily) {
             val at = Reminder.dailyMin(this, m)
             "Todos los días a las %02d:%02d".format(at / 60, at % 60)
