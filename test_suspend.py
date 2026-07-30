@@ -7,6 +7,12 @@ spec = importlib.util.spec_from_loader('descanso', loader)
 descanso = importlib.util.module_from_spec(spec)
 loader.exec_module(descanso)
 
+# descanso.time ES el módulo real time (no una copia): los tests que lo
+# mockean pisan time.time()/sleep() para todo el proceso. Guardamos las
+# funciones reales ANTES de que nada las mute, para poder restaurarlas.
+_REAL_TIME = descanso.time.time
+_REAL_SLEEP = descanso.time.sleep
+
 
 def run_sim(ticks):
     """ticks: un valor por iteración del loop (avanza con cada sleep)."""
@@ -39,8 +45,9 @@ def run_sim(ticks):
         'active_interval_min': 60, 'active_duration_sec': 180,
         'water_interval_min': 30, 'water_duration_sec': 10,
         'lunch_time': '03:00', 'sleep_time': '03:30',
-        'music_url': '', 'animal': 'perro', 'sound': False,
+        'ambient_sound': 'ninguno', 'animal': 'perro', 'sound': False,
         'weather_city': '', 'language': 'es', 'theme': 'dark',
+        'widget': False,
     }
 
     t0 = ticks[0]
@@ -74,8 +81,42 @@ def test_small_gap_no_reset():
     assert n == 1, f"esperaba 1 (solo inicial), got {n}"
 
 
+def test_write_state_rollover_and_content():
+    import tempfile, json as _json
+    from pathlib import Path
+    descanso.time.time = _REAL_TIME
+    descanso.time.sleep = _REAL_SLEEP
+    tmpdir = Path(tempfile.mkdtemp())
+    descanso.STATE_FILE = tmpdir / 'state.json'
+    descanso.SNOOZE_FILE = tmpdir / 'snooze_until'  # no existe -> snoozed_until None
+    descanso.CONFIG_DIR = tmpdir
+    now = descanso.datetime(2026, 7, 30, 23, 0)  # después de almuerzo (12:00) y dormir (22:30)
+    hoy = now.date()
+    config = {'lunch_time': '12:00', 'sleep_time': '22:30', 'theme': 'dark'}
+    descanso.write_state(100.0, 200.0, 300.0, 1200, 3600, 1800, config, hoy, now)
+    data = _json.loads(descanso.STATE_FILE.read_text())
+    assert data['next_visual'] == 100.0
+    assert data['visual_interval'] == 1200
+    assert data['snoozed_until'] is None
+    lunch_dt = descanso.datetime.fromtimestamp(data['next_lunch'])
+    assert lunch_dt.date() == hoy + descanso.timedelta(days=1), \
+        "almuerzo ya pasó hoy, debería rodar a mañana"
+
+
+def test_widget_fmt_remaining():
+    loader = importlib.machinery.SourceFileLoader('descanso_widget', 'descanso-widget')
+    spec = importlib.util.spec_from_loader('descanso_widget', loader)
+    widget = importlib.util.module_from_spec(spec)
+    loader.exec_module(widget)
+    assert widget.fmt_remaining(125, 0) == '02:05'
+    assert widget.fmt_remaining(3725, 0) == '1h 02m'
+    assert widget.fmt_remaining(-5, 0) == 'ahora'
+
+
 if __name__ == '__main__':
     test_initial_fire()
     test_suspend_resets_timers()
     test_small_gap_no_reset()
-    print("OK: 3 tests pasaron")
+    test_write_state_rollover_and_content()
+    test_widget_fmt_remaining()
+    print("OK: 5 tests pasaron")

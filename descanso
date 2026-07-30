@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import json
 import os
+import random
 import subprocess
 import sys
 import time
@@ -14,6 +15,9 @@ CONFIG_FILE = CONFIG_DIR / 'config.json'
 STATS_FILE = CONFIG_DIR / 'stats.json'
 SNOOZE_FILE = CONFIG_DIR / 'snooze_until'
 WEATHER_CACHE = CONFIG_DIR / 'weather_cache'
+STATE_FILE = CONFIG_DIR / 'state.json'
+
+AMBIENT_SOUNDS = ('lluvia', 'olas')
 
 DEFAULT_CONFIG = {
     "visual_interval_min": 20,
@@ -24,12 +28,13 @@ DEFAULT_CONFIG = {
     "water_duration_sec": 10,
     "lunch_time": "12:00",
     "sleep_time": "22:30",
-    "music_url": "https://streams.fluxfm.de/lofi/mp3-128/",
+    "ambient_sound": "aleatorio",
     "animal": "perro",
     "theme": "dark",
     "weather_city": "",
     "sound": True,
     "language": "auto",
+    "widget": True,
 }
 
 def detect_lang():
@@ -233,6 +238,37 @@ def find_pantalla():
             return str(c)
     return str(script_dir / 'pantalla-descanso')
 
+def find_sound(name):
+    script_dir = Path(__file__).resolve().parent
+    candidates = [
+        script_dir / 'sounds' / f'{name}.mp3',
+        Path.home() / '.local' / 'bin' / 'sounds' / f'{name}.mp3',
+    ]
+    for c in candidates:
+        if c.exists():
+            return str(c)
+    return None
+
+def resolve_ambient(choice):
+    if choice in (None, '', 'ninguno'):
+        return None
+    if choice == 'aleatorio':
+        choice = random.choice(AMBIENT_SOUNDS)
+    return find_sound(choice)
+
+def find_widget():
+    script_dir = Path(__file__).resolve().parent
+    candidates = [
+        script_dir / 'descanso-widget',
+        script_dir / 'descanso-widget.exe',
+        Path.home() / '.local' / 'bin' / 'descanso-widget',
+        Path.home() / '.local' / 'bin' / 'descanso-widget.exe',
+    ]
+    for c in candidates:
+        if c.exists():
+            return str(c)
+    return None
+
 def launch_break(mode, duration, animal, weather):
     script = find_pantalla()
     args = [sys.executable, script, str(duration), mode, animal]
@@ -246,6 +282,32 @@ def launch_break(mode, duration, animal, weather):
 def parse_time(t_str, day):
     h, m = t_str.split(':')
     return datetime(day.year, day.month, day.day, int(h), int(m))
+
+def write_state(next_visual, next_active, next_water, vi, ai, wi, config, hoy, now):
+    lunch = parse_time(config['lunch_time'], hoy)
+    if lunch < now:
+        lunch += timedelta(days=1)
+    sleep = parse_time(config['sleep_time'], hoy)
+    if sleep < now:
+        sleep += timedelta(days=1)
+    try:
+        CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+        with open(STATE_FILE, 'w') as f:
+            json.dump({
+                'next_visual': next_visual,
+                'next_active': next_active,
+                'next_water': next_water,
+                'visual_interval': vi,
+                'active_interval': ai,
+                'water_interval': wi,
+                'next_lunch': lunch.timestamp(),
+                'next_sleep': sleep.timestamp(),
+                'snoozed_until': float(SNOOZE_FILE.read_text().strip()) if SNOOZE_FILE.exists() else None,
+                'theme': config.get('theme', 'dark'),
+                'updated': time.time(),
+            }, f)
+    except Exception:
+        pass
 
 def print_update(show_weekly=False):
     stats = load_stats()
@@ -285,7 +347,7 @@ def main():
     last_tick = time.time()
 
     animal = config['animal']
-    music = config['music_url']
+    ambient = config.get('ambient_sound', 'aleatorio')
     weather_city = config.get('weather_city', '')
 
     weather = get_weather(weather_city) if weather_city else None
@@ -299,7 +361,7 @@ def main():
     print(S['sleep_line'].format(t=config['sleep_time']))
     print(S['animal_line'].format(a=animal))
     print(S['theme_line'].format(t=config.get('theme', 'dark')))
-    print(S['music_line'].format(v=S['yes'] if music else S['no']))
+    print(S['music_line'].format(v=S['no'] if ambient in (None, '', 'ninguno') else ambient))
     print(S['sound_line'].format(v=S['yes'] if use_sound else S['no']))
     if weather:
         print(S['weather_line'].format(w=weather))
@@ -314,6 +376,14 @@ def main():
         print(f"{S['week_prefix']}{'  ·  '.join(wparts)}")
     print(S['footer_bar'])
 
+    if config.get('widget', True):
+        widget = find_widget()
+        if widget:
+            try:
+                subprocess.Popen([sys.executable, widget])
+            except Exception:
+                pass
+
     while True:
         now = datetime.now()
         hoy = now.date()
@@ -325,6 +395,8 @@ def main():
             next_active = now_t + ai
             next_water = now_t + wi
         last_tick = now_t
+
+        write_state(next_visual, next_active, next_water, vi, ai, wi, config, hoy, now)
 
         if weather_city and time.time() >= next_weather_check:
             weather = get_weather(weather_city)
@@ -353,14 +425,14 @@ def main():
             if time.time() >= next_active:
                 print(f"[{now.strftime('%H:%M')}] {S['mode_active']}")
                 trigger_break('activo', config['active_duration_sec'], animal, weather, use_sound,
-                               music_url=music, show_weekly=True)
+                               music_url=resolve_ambient(ambient), show_weekly=True)
                 next_active = time.time() + ai
                 next_visual = time.time() + vi
 
             if time.time() >= next_visual:
                 print(f"[{now.strftime('%H:%M')}] {S['mode_visual']}")
                 trigger_break('visual', config['visual_duration_sec'], animal, weather, use_sound,
-                               music_url=music)
+                               music_url=resolve_ambient(ambient))
                 next_visual = time.time() + vi
 
         time.sleep(5)

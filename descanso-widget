@@ -1,0 +1,181 @@
+#!/usr/bin/env python3
+import json
+import os
+import sys
+import time
+import tkinter as tk
+from pathlib import Path
+
+CONFIG_DIR = Path.home() / '.config' / 'descanso-visual'
+STATE_FILE = CONFIG_DIR / 'state.json'
+POS_FILE = CONFIG_DIR / 'widget_pos.json'
+LOCK_FILE = CONFIG_DIR / 'widget.pid'
+
+MONO = "Consolas" if sys.platform == "win32" else "monospace"
+SANS = "Segoe UI" if sys.platform == "win32" else "sans-serif"
+
+ROWS = [
+    ('next_visual', 'visual_interval', '👀', '#ffcc66'),
+    ('next_active', 'active_interval', '🏃', '#88ff88'),
+    ('next_water', 'water_interval', '💧', '#66ccff'),
+]
+
+W = H = 176
+R = 22
+BAR_X0, BAR_X1 = 52, W - 16
+ROW_Y0, ROW_STEP = 46, 40
+
+
+def already_running():
+    if not LOCK_FILE.exists():
+        return False
+    try:
+        pid = int(LOCK_FILE.read_text().strip())
+        os.kill(pid, 0)
+        return True
+    except Exception:
+        return False
+
+
+def fmt_remaining(target_ts, now_ts):
+    remaining = int(target_ts - now_ts)
+    if remaining <= 0:
+        return "ahora"
+    h, rem = divmod(remaining, 3600)
+    m, s = divmod(rem, 60)
+    if h > 0:
+        return f"{h}h {m:02d}m"
+    return f"{m:02d}:{s:02d}"
+
+
+def round_rect(canvas, x1, y1, x2, y2, r, **kwargs):
+    points = [
+        x1 + r, y1, x2 - r, y1, x2, y1, x2, y1 + r,
+        x2, y2 - r, x2, y2, x2 - r, y2, x1 + r, y2,
+        x1, y2, x1, y2 - r, x1, y1 + r, x1, y1,
+    ]
+    return canvas.create_polygon(points, smooth=True, **kwargs)
+
+
+class Widget:
+    def __init__(self):
+        self.root = tk.Tk()
+        self.root.overrideredirect(True)
+        try:
+            self.root.attributes('-topmost', True)
+        except Exception:
+            pass
+        try:
+            self.root.attributes('-alpha', 0.94)
+        except Exception:
+            pass
+
+        x, y = self._load_pos()
+        self.root.geometry(f"{W}x{H}+{x}+{y}")
+
+        self.canvas = tk.Canvas(self.root, width=W, height=H,
+            highlightthickness=0, bg='#0a0a1a')
+        self.canvas.pack(fill='both', expand=True)
+
+        self._drag = {'x': 0, 'y': 0}
+        self.canvas.bind('<ButtonPress-1>', self._drag_start)
+        self.canvas.bind('<B1-Motion>', self._drag_move)
+        self.canvas.bind('<ButtonRelease-1>', self._save_pos)
+
+        self._draw_static()
+        self._tick()
+
+    def _load_pos(self):
+        try:
+            d = json.loads(POS_FILE.read_text())
+            return int(d['x']), int(d['y'])
+        except Exception:
+            sw = self.root.winfo_screenwidth()
+            sh = self.root.winfo_screenheight()
+            return sw - W - 24, sh - H - 64
+
+    def _save_pos(self, _e=None):
+        try:
+            CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+            x = self.root.winfo_x()
+            y = self.root.winfo_y()
+            POS_FILE.write_text(json.dumps({'x': x, 'y': y}))
+        except Exception:
+            pass
+
+    def _drag_start(self, e):
+        if e.x > W - 26 and e.y < 26:
+            return
+        self._drag = {'x': e.x, 'y': e.y}
+
+    def _drag_move(self, e):
+        x = self.root.winfo_x() + (e.x - self._drag['x'])
+        y = self.root.winfo_y() + (e.y - self._drag['y'])
+        self.root.geometry(f"+{x}+{y}")
+
+    def _draw_static(self):
+        c = self.canvas
+        round_rect(c, 1, 1, W - 1, H - 1, R, fill='#12122a', outline='#2a2a4a')
+        c.create_text(14, 16, anchor='w', text='Descanso', fill='#8080b0',
+            font=(SANS, 10, 'bold'))
+        close = c.create_text(W - 15, 15, text='×', fill='#8080b0',
+            font=(SANS, 13, 'bold'), tags='close')
+        c.tag_bind(close, '<Button-1>', lambda e: self.root.destroy())
+
+        self.row_items = []
+        self.bar_items = []
+        self.bar_y = []
+        for i, (_, _, icon, color) in enumerate(ROWS):
+            ry = ROW_Y0 + i * ROW_STEP
+            c.create_text(24, ry, anchor='w', text=icon, font=(SANS, 15))
+            item = c.create_text(BAR_X0, ry, anchor='w', text='--:--',
+                fill=color, font=(MONO, 14, 'bold'))
+            self.row_items.append(item)
+
+            by = ry + 13
+            c.create_rectangle(BAR_X0, by, BAR_X1, by + 4,
+                fill='#22223a', outline='')
+            bar = c.create_rectangle(BAR_X0, by, BAR_X0, by + 4,
+                fill=color, outline='')
+            self.bar_items.append(bar)
+            self.bar_y.append(by)
+
+    def _read_state(self):
+        try:
+            return json.loads(STATE_FILE.read_text())
+        except Exception:
+            return None
+
+    def _tick(self):
+        state = self._read_state()
+        now = time.time()
+        stale = state is None or (now - state.get('updated', 0)) > 60
+        snoozed = state and state.get('snoozed_until') and state['snoozed_until'] > now
+
+        rows = zip(ROWS, self.row_items, self.bar_items, self.bar_y)
+        for (key, ikey, _, color), item, bar, by in rows:
+            if stale or snoozed:
+                self.canvas.itemconfig(item, text='sin datos' if stale else 'pospuesto')
+                self.canvas.coords(bar, BAR_X0, by, BAR_X0, by + 4)
+                continue
+            self.canvas.itemconfig(item, text=fmt_remaining(state[key], now))
+            interval = state.get(ikey) or 0
+            frac = 0.0 if interval <= 0 else max(0.0, min(1.0, 1 - (state[key] - now) / interval))
+            self.canvas.coords(bar, BAR_X0, by, BAR_X0 + frac * (BAR_X1 - BAR_X0), by + 4)
+
+        self.root.after(1000, self._tick)
+
+
+def main():
+    if already_running():
+        return
+    try:
+        CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+        LOCK_FILE.write_text(str(os.getpid()))
+    except Exception:
+        pass
+    Widget().root.mainloop()
+
+
+if __name__ == '__main__':
+    main()

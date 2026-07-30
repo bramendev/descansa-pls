@@ -42,7 +42,7 @@ Un solo script — corre directo desde la carpeta clonada, sin compilar nada.
 - **Pixel art animado**: perro o gato en `sprites/<animal>/`, con un ciclo de caminata real de 4 cuadros; si no hay sprites, cae al ASCII art clásico
 - **Teclas**: Espacio saltar, Z snooze 5 min, Escape cerrar, Enter desbloquear
 - **Sonido**: beep al iniciar cada pausa (ffplay o winsound)
-- **Música lo-fi**: opcional durante las pausas
+- **Sonido ambiente**: lluvia u olas (CC0, incluidos en `sounds/`) durante las pausas visual y activa, elegido al azar por defecto
 - **Tema claro/oscuro**: auto (según hora) o manual
 - **Estadísticas**: hoy y semana, mostradas en pantalla y logs
 - **Clima**: muestra el clima actual (configura `weather_city`)
@@ -64,8 +64,8 @@ En macOS y Windows el instalador oficial de python.org ya lo incluye.
 No hay dependencias de pip — todo el script usa librería estándar
 (`tkinter`, `json`, `urllib`, etc.), así que no hace falta `requirements.txt`
 ni entorno virtual. La única dependencia opcional es un binario externo,
-**`ffplay`** (parte de [ffmpeg](https://ffmpeg.org)), para el beep y la
-música lo-fi; sin él la app funciona igual, solo sin sonido.
+**`ffplay`** (parte de [ffmpeg](https://ffmpeg.org)), para el beep y el
+sonido ambiente; sin él la app funciona igual, solo sin sonido.
 
 ```bash
 git clone git@github.com:bramendev/descansa-pls.git
@@ -114,6 +114,7 @@ apagados y reinicios porque se relanza sola en cada login.
   cp descanso ~/.local/bin/
   cp pantalla-descanso ~/.local/bin/
   cp -r sprites ~/.local/bin/        # pixel art (opcional; sin esto usa ASCII)
+  cp -r sounds ~/.local/bin/         # sonido ambiente (opcional; sin esto queda mudo)
   cp descanso.service ~/.config/systemd/user/
   systemctl --user daemon-reload
   systemctl --user enable --now descanso
@@ -169,7 +170,7 @@ Editar `~/.config/descanso-visual/config.json`:
   "water_duration_sec": 10,
   "lunch_time": "12:00",
   "sleep_time": "22:30",
-  "music_url": "https://streams.fluxfm.de/lofi/mp3-128/",
+  "ambient_sound": "aleatorio",
   "animal": "perro",
   "theme": "dark",
   "weather_city": "",
@@ -180,6 +181,13 @@ Editar `~/.config/descanso-visual/config.json`:
 
 `language` acepta `"auto"` (detecta español o inglés del sistema),
 `"es"` o `"en"` para forzarlo.
+
+`ambient_sound` elige qué suena de fondo en las pausas visual y activa:
+`"aleatorio"` (por defecto, alterna entre los disponibles), `"lluvia"`,
+`"olas"` o `"ninguno"` para desactivarlo. Los audios son CC0
+([bigsoundbank.com](https://bigsoundbank.com), grabaciones de Joseph Sardin)
+y están en `sounds/`; para agregar más, sumá un `<nombre>.mp3` ahí y a
+`AMBIENT_SOUNDS` en `descanso`.
 
 ### Modos de pantalla
 

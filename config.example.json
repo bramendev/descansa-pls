@@ -7,7 +7,7 @@
   "water_duration_sec": 10,
   "lunch_time": "12:00",
   "sleep_time": "22:30",
-  "music_url": "https://streams.fluxfm.de/lofi/mp3-128/",
+  "ambient_sound": "aleatorio",
   "animal": "perro",
   "theme": "dark",
   "weather_city": "",
