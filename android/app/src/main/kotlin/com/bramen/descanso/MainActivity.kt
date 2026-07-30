@@ -2,6 +2,7 @@ package com.bramen.descanso
 
 import android.app.Activity
 import android.app.AlertDialog
+import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
@@ -20,6 +21,7 @@ import android.widget.NumberPicker
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.TimePicker
+import android.widget.Toast
 import java.time.LocalDate
 
 class MainActivity : Activity() {
@@ -193,11 +195,14 @@ class MainActivity : Activity() {
 
     private fun openSettings() {
         val vib = CheckBox(this).apply {
-            text = "Vibrar al avisar"; isChecked = Reminder.vibrates(this@MainActivity)
+            text = "Vibrar al avisar"
+            isChecked = Reminder.vibrates(this@MainActivity)
+            setTextColor(primary)
         }
         val status = CheckBox(this).apply {
             text = "Notificación fija con la cuenta atrás"
             isChecked = Reminder.showStatus(this@MainActivity)
+            setTextColor(primary)
         }
         val qFrom = hourPicker(Reminder.quietFrom(this))
         val qTo = hourPicker(Reminder.quietTo(this))
@@ -206,6 +211,17 @@ class MainActivity : Activity() {
             hint = "Un tip por línea"
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE
             minLines = 3
+            maxLines = 10
+            setBackgroundColor(cardBg)
+            setPadding(dp(16), dp(12), dp(16), dp(12))
+            setTextColor(primary)
+            setHintTextColor(muted)
+            // Estilo de borde
+            background = GradientDrawable().apply {
+                cornerRadius = dp(8).toFloat()
+                setColor(cardBg)
+                setStroke(dp(1), track)
+            }
         }
 
         val on = HashMap<Mode, CheckBox>()
@@ -215,53 +231,76 @@ class MainActivity : Activity() {
 
         val form = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(24), dp(8), dp(24), 0)
+            setPadding(dp(24), dp(8), dp(24), dp(24))
 
-            addView(section("General"))
+            // ============ SECCIÓN: GENERAL ============
+            addView(sectionHeader("🎵  General", accent))
+            
             addView(vib)
             addView(status)
-            addView(label("No molestar desde / hasta (hora)"))
+            addView(space(dp(16)))
+
+            // ============ SECCIÓN: NO MOLESTAR ============
+            addView(sectionHeader("🌙  No molestar", accent))
+            addView(label("Horario de silencio"))
             addView(LinearLayout(this@MainActivity).apply {
                 orientation = LinearLayout.HORIZONTAL
-                addView(qFrom)
-                addView(qTo)
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(0, dp(8), 0, dp(16))
+                
+                addView(TextView(this@MainActivity).apply {
+                    text = "De"
+                    textSize = 14f
+                    setTextColor(muted)
+                    setPadding(dp(8), 0, dp(8), 0)
+                    layoutParams = LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT)
+                })
+                addView(qFrom.apply { 
+                    layoutParams = LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f)
+                })
+                addView(TextView(this@MainActivity).apply {
+                    text = "a"
+                    textSize = 14f
+                    setTextColor(muted)
+                    setPadding(dp(8), 0, dp(8), 0)
+                    layoutParams = LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT)
+                })
+                addView(qTo.apply { 
+                    layoutParams = LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f)
+                })
             })
+            addView(divider())
+            addView(space(dp(16)))
+
+            // ============ SECCIÓN: MENSAJES PERSONALIZADOS ============
+            addView(sectionHeader("✏️  Mensajes personalizados", accent))
             addView(label("Tips propios (uno por línea)"))
             addView(tips)
+            addView(space(dp(16)))
+            addView(divider())
+            addView(space(dp(16)))
+
+            // ============ SECCIÓN: MODOS DE RECORDATORIO ============
+            addView(sectionHeader("📊  Modos de recordatorio", accent))
+            addView(label("Configura cada modo individualmente"))
+            addView(space(dp(12)))
 
             for (m in Mode.values()) {
-                addView(section("${m.emoji}  ${m.title}"))
-                val chk = CheckBox(this@MainActivity).apply {
-                    text = "Activado"; isChecked = Reminder.isOn(this@MainActivity, m)
-                }
-                on[m] = chk
-                addView(chk)
-                if (m.isDaily) {
-                    val at = Reminder.dailyMin(this@MainActivity, m)
-                    val tp = TimePicker(this@MainActivity).apply {
-                        setIs24HourView(true)
-                        hour = at / 60
-                        minute = at % 60
-                    }
-                    times[m] = tp
-                    addView(tp)
-                } else {
-                    addView(label("Avisarme cada (minutos)"))
-                    val np = numberPicker(1, 240, Reminder.everyMin(this@MainActivity, m))
-                    every[m] = np
-                    addView(np)
-                }
-                addView(label("Duración de la pausa (segundos)"))
-                val sp = numberPicker(5, 600, Reminder.breakSec(this@MainActivity, m))
-                secs[m] = sp
-                addView(sp)
+                // Card para cada modo
+                addView(modeSettingsCard(m, on, every, secs, times))
+                addView(space(dp(16)))
             }
         }
 
         AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
-            .setTitle("Configuración")
+            .setTitle("⚙  Configuración")
             .setView(ScrollView(this).apply { addView(form) })
             .setPositiveButton("Guardar") { _, _ ->
+                // Validar datos
+                if (!validateSettings(on, every, secs)) {
+                    return@setPositiveButton
+                }
+                
                 Reminder.saveGlobal(this, vib.isChecked, status.isChecked,
                     qFrom.value, qTo.value, tips.text.toString())
                 for (m in Mode.values()) {
@@ -273,15 +312,134 @@ class MainActivity : Activity() {
                         secs[m]?.value ?: Reminder.breakSec(this, m),
                         atMin)
                 }
-                // Reagenda para que los ajustes nuevos apliquen ya, no en el ciclo siguiente.
+                // Reagenda para que los ajustes nuevos apliquen ya
                 if (!Reminder.isPaused(this)) Reminder.scheduleAll(this) else Reminder.status(this)
+                
+                // Feedback al usuario
+                Toast.makeText(this, "✓ Configuración guardada", Toast.LENGTH_SHORT).show()
                 recreate()
             }
             .setNegativeButton("Cancelar", null)
             .show()
     }
 
-    private fun hourPicker(value: Int) = numberPicker(0, 23, value)
+    /** Crea una tarjeta de configuración para un modo específico */
+    private fun modeSettingsCard(
+        m: Mode, 
+        on: HashMap<Mode, CheckBox>,
+        every: HashMap<Mode, NumberPicker>,
+        secs: HashMap<Mode, NumberPicker>,
+        times: HashMap<Mode, TimePicker>
+    ): View {
+        val card = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = GradientDrawable().apply {
+                cornerRadius = dp(12).toFloat()
+                setColor(cardBg)
+            }
+            setPadding(dp(20), dp(16), dp(20), dp(16))
+            layoutParams = LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT)
+        }
+        
+        // Header del modo
+        card.addView(TextView(this).apply {
+            text = "${m.emoji}  ${m.title}"
+            textSize = 18f
+            setTextColor(m.tint)
+            setTypeface(typeface, Typeface.BOLD)
+            setPadding(0, 0, 0, dp(12))
+        })
+        
+        // Checkbox de activado
+        val chk = CheckBox(this).apply {
+            text = "Activado"
+            isChecked = Reminder.isOn(this@MainActivity, m)
+            setTextColor(primary)
+        }
+        on[m] = chk
+        card.addView(chk)
+        card.addView(space(dp(16)))
+        
+        // Configuración específica del modo
+        if (m.isDaily) {
+            card.addView(label("Hora del recordatorio"))
+            val tp = TimePicker(this).apply {
+                setIs24HourView(true)
+                hour = Reminder.dailyMin(this@MainActivity, m) / 60
+                minute = Reminder.dailyMin(this@MainActivity, m) % 60
+                setBackgroundColor(cardBg)
+                setPadding(dp(8), dp(8), dp(8), dp(8))
+            }
+            times[m] = tp
+            card.addView(tp)
+            card.addView(space(dp(8)))
+        } else {
+            card.addView(label("Avisarme cada (minutos)"))
+            val np = numberPicker(1, 240, Reminder.everyMin(this@MainActivity, m))
+            every[m] = np
+            card.addView(np)
+            card.addView(space(dp(8)))
+        }
+        
+        // Duración de la pausa
+        card.addView(label("Duración de la pausa"))
+        val sp = numberPicker(5, 600, Reminder.breakSec(this@MainActivity, m))
+        secs[m] = sp
+        card.addView(sp)
+        
+        return card
+    }
+
+    /** Valida que los datos de configuración sean válidos */
+    private fun validateSettings(
+        on: HashMap<Mode, CheckBox>,
+        every: HashMap<Mode, NumberPicker>,
+        secs: HashMap<Mode, NumberPicker>
+    ): Boolean {
+        for (m in Mode.values()) {
+            if (on[m]?.isChecked == true) {
+                // Si está activado, la duración debe ser > 0
+                val duration = secs[m]?.value ?: Reminder.breakSec(this, m)
+                if (duration <= 0) {
+                    Toast.makeText(this, "La duración debe ser mayor a 0 segundos", Toast.LENGTH_LONG).show()
+                    return false
+                }
+                
+                // Para modos no diarios, el intervalo debe ser > 0
+                if (!m.isDaily) {
+                    val interval = every[m]?.value ?: Reminder.everyMin(this, m)
+                    if (interval <= 0) {
+                        Toast.makeText(this, "El intervalo debe ser mayor a 0 minutos", Toast.LENGTH_LONG).show()
+                        return false
+                    }
+                }
+            }
+        }
+        return true
+    }
+
+    /** Crea un divisor horizontal */
+    private fun divider(): View = View(this).apply {
+        layoutParams = LinearLayout.LayoutParams(MATCH_PARENT, dp(1))
+        setBackgroundColor(track)
+    }
+
+    /** Crea un header de sección */
+    private fun sectionHeader(text: String, color: Int): TextView {
+        return TextView(this).apply {
+            this.text = text
+            textSize = 16f
+            setTextColor(color)
+            setTypeface(typeface, Typeface.BOLD)
+            setPadding(0, dp(8), 0, dp(8))
+            layoutParams = LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT)
+        }
+    }
+
+    private fun hourPicker(value: Int) = numberPicker(0, 23, value).apply {
+        // Estilo específico para el hora picker
+        setBackgroundColor(cardBg)
+    }
 
     private fun numberPicker(min: Int, max: Int, value: Int) = NumberPicker(this).apply {
         minValue = min
@@ -289,6 +447,9 @@ class MainActivity : Activity() {
         this.value = value.coerceIn(min, max)
         // Dentro de un ScrollView el gesto lo robaría el scroll y no se podría girar.
         setOnTouchListener { v, _ -> v.parent.requestDisallowInterceptTouchEvent(true); false }
+        // Estilo para que se vea mejor
+        setBackgroundColor(cardBg)
+        setPadding(dp(8), dp(8), dp(8), dp(8))
     }
 
     private fun section(t: String) = text(t, 16, accent, bold = true).apply {

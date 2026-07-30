@@ -5,6 +5,8 @@ import android.content.Context
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.media.Ringtone
+import android.media.RingtoneManager
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -70,8 +72,21 @@ class BreakActivity : Activity() {
         var left = Reminder.breakSec(this, mode)
         val tick = object : Runnable {
             override fun run() {
-                if (left > 0) { timer.text = "$left"; left--; h.postDelayed(this, 1000) }
-                else { timer.text = "✓"; title.text = "¡Listo! Puedes continuar" }
+                if (left > 0) {
+                    timer.text = "$left"
+                    left--
+                    h.postDelayed(this, 1000)
+                } else {
+                    timer.text = "✓"
+                    title.text = "¡Listo! Puedes continuar"
+                    timer.setTextColor(Color.GREEN)
+                    
+                    // Vibración al finalizar
+                    vibrate()
+                    
+                    // Sonido de notificación al finalizar
+                    playCompletionSound()
+                }
             }
         }
         tick.run()
@@ -82,10 +97,22 @@ class BreakActivity : Activity() {
         h.removeCallbacksAndMessages(null)
     }
 
-    private fun vibrate() {
+    private fun vibrate(duration: Long = 200) {
         if (!Reminder.vibrates(this)) return
         val v = getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
-        v.vibrate(VibrationEffect.createOneShot(200, VibrationEffect.DEFAULT_AMPLITUDE))
+        v.vibrate(VibrationEffect.createOneShot(duration, VibrationEffect.DEFAULT_AMPLITUDE))
+    }
+
+    private fun playCompletionSound() {
+        if (!Reminder.vibrates(this)) return // Usamos el mismo ajuste para el sonido
+        try {
+            val ringtoneUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+            val ringtone = RingtoneManager.getRingtone(this, ringtoneUri)
+            ringtone.play()
+        } catch (e: Exception) {
+            // Si falla el sonido, al menos vibramos más tiempo
+            vibrate(500)
+        }
     }
 
     private fun pill(label: String, color: Int) = Button(this).apply {
