@@ -28,37 +28,52 @@ de las pausas, configuración rediseñada, modo oscuro, animación de animal y t
 
 ### Cambios técnicos
 
-- `AndroidManifest`: temas personalizados `AppTheme` y `AppTheme.Fullscreen`
-  con soporte para modo oscuro vía `values-night/themes.xml`.
-- `Reminder`: añade `themeMode()`, `animal()`; `saveGlobal()` actualizada.
-- `BreakActivity`: animación de frames, `vibrateEnd()`, estadísticas, colores adaptados.
-- `MainActivity`: configuración reorganizada, pantalla inicial simplificada.
-- **Recursos**: añadidos `dog_frame0-3.png`, `cat_frame0-3.png`, `values/themes.xml`, `values-night/themes.xml`.
-
-### Mejoras
-
-- **Alertas al finalizar la pausa**: vibración y sonido cuando el cronómetro
-  llega a cero, con cambio visual (timer en verde, "¡Listo! Puedes continuar").
-- **Animación de animal**: pantalla de pausa muestra perro o gato caminando en
-  frames animados (como en escritorio). Seleccionable en Configuración → Apariencia.
-- **Configuración reorganizada**: diálogo de ajustes con secciones claras
-  (Apariencia, Notificaciones, No molestar, Mensajes, Modos).
-- **Soporte para modo oscuro**: sigue el modo del sistema automáticamente,
-  con opción para forzar claro/oscuro/auto en Configuración.
-- **Botón guardar al final**: ahora está al final del diálogo de ajustes.
-- **Pantalla inicial simplificada**: diseño más limpio con secciones:
-  estado, próximo descanso, modos activos, estadísticas.
-- **Estadísticas en pantalla de pausa**: muestra racha, hoy, semana, total.
-- **Validación de datos**: comprueba duración e intervalos > 0.
-- **Feedback al guardar**: toast "✓ Configuración guardada".
-
-### Cambios técnicos
-
-- `AndroidManifest`: tema `Theme.Material.DayNight.NoActionBar` para modo oscuro.
+- El modo oscuro se resuelve por código (`isDarkMode()`/`updateColors()` en
+  `MainActivity`/`BreakActivity`, según `Configuration.UI_MODE_NIGHT_MASK` o
+  la preferencia guardada), no vía tema de sistema: el manifest sigue fijo en
+  `Theme.Material.Light.NoActionBar`. Un intento anterior con
+  `values-night/themes.xml` se descartó por referenciar temas inexistentes.
 - `Reminder`: añade `themeMode()`, `animal()`; `saveGlobal()` actualizada.
 - `BreakActivity`: animación de frames, `vibrateEnd()`, estadísticas, colores adaptados.
 - `MainActivity`: configuración reorganizada, pantalla inicial simplificada.
 - **Recursos**: añadidos `dog_frame0-3.png` y `cat_frame0-3.png`.
+
+## v1.7 — 2026-07-30
+
+El APK de v1.6 no llegó a compilar en CI (varios errores de Kotlin en el
+diálogo de configuración); esta versión los arregla y de paso trae widget
+flotante y sonido ambiente nuevos en la versión de escritorio.
+
+### Arreglado (Android)
+
+- `lateinit var` sobre `Int` no compila en Kotlin; los colores de tema pasan
+  a `var` con valor por defecto.
+- El botón "Guardar" leía `this` sin calificar dentro de un lambda anidado en
+  un `LinearLayout.apply{}`, así que resolvía al `LinearLayout` en vez de la
+  `Activity` — de ahí los "Context expected, LinearLayout found". Se califica
+  `this@MainActivity` donde corresponde.
+- `.children` requiere la dependencia `core-ktx`, que el proyecto no tiene;
+  se reemplaza por `getChildAt()`.
+- El selector de tema leía el checkbox equivocado: había un `View` espaciador
+  entre cada opción y el índice no lo tenía en cuenta, así que tocar "Guardar"
+  con "Claro" seleccionado habría lanzado `ClassCastException` en runtime.
+
+### Nuevo (Escritorio)
+
+- **Widget flotante**: burbuja cuadrada de bordes redondeados, arrastrable y
+  siempre visible, con cuenta regresiva y barra de progreso para los
+  recordatorios visual/activo/agua. Se lanza sola junto con `descanso`
+  (desactivable con `"widget": false` en la config).
+- **Sonido ambiente local**: reemplaza el streaming de radio lo-fi (`music_url`,
+  a veces con gente hablando encima) por lluvia u olas — audio CC0 bundleado
+  en `sounds/`, elegido al azar en cada pausa por defecto
+  (`"ambient_sound": "aleatorio"`).
+
+### Cambios técnicos
+
+- `descanso` escribe `~/.config/descanso-visual/state.json` en cada ciclo del
+  loop principal para que el widget pueda leer los próximos descansos sin
+  acoplarse al proceso.
 
 ## v1.4 — 2026-07-27
 
