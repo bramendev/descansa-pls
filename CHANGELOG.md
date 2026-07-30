@@ -4,39 +4,16 @@ Todas las versiones publicadas. Cada tag `v*` genera un
 [Release](https://github.com/bramendev/descansa-pls/releases) con el APK, y
 las notas salen de la sección correspondiente de este archivo.
 
-## v1.6 — 2026-07-30
+## v1.8 — 2026-07-30
 
-Mejora de usabilidad y experiencia en la app Android: notificaciones al final
-de las pausas, configuración rediseñada, modo oscuro, animación de animal y temas personalizables.
+### Arreglado (Android)
 
-### Mejoras
-
-- **Alertas al finalizar la pausa**: vibración y sonido cuando el cronómetro
-  llega a cero, con cambio visual (timer en verde, "¡Listo! Puedes continuar").
-- **Animación de animal**: pantalla de pausa muestra perro o gato caminando en
-  frames animados (como en escritorio). Seleccionable en Configuración → Apariencia.
-- **Configuración reorganizada**: diálogo de ajustes con secciones claras
-  (Apariencia, Notificaciones, No molestar, Mensajes, Modos).
-- **Soporte para modo oscuro**: sigue el modo del sistema automáticamente,
-  con opción para forzar claro/oscuro/auto en Configuración.
-- **Botón guardar al final**: ahora está al final del diálogo de ajustes.
-- **Pantalla inicial simplificada**: diseño más limpio con secciones:
-  estado, próximo descanso, modos activos, estadísticas.
-- **Estadísticas en pantalla de pausa**: muestra racha, hoy, semana, total.
-- **Validación de datos**: comprueba duración e intervalos > 0.
-- **Feedback al guardar**: toast "✓ Configuración guardada".
-
-### Cambios técnicos
-
-- El modo oscuro se resuelve por código (`isDarkMode()`/`updateColors()` en
-  `MainActivity`/`BreakActivity`, según `Configuration.UI_MODE_NIGHT_MASK` o
-  la preferencia guardada), no vía tema de sistema: el manifest sigue fijo en
-  `Theme.Material.Light.NoActionBar`. Un intento anterior con
-  `values-night/themes.xml` se descartó por referenciar temas inexistentes.
-- `Reminder`: añade `themeMode()`, `animal()`; `saveGlobal()` actualizada.
-- `BreakActivity`: animación de frames, `vibrateEnd()`, estadísticas, colores adaptados.
-- `MainActivity`: configuración reorganizada, pantalla inicial simplificada.
-- **Recursos**: añadidos `dog_frame0-3.png` y `cat_frame0-3.png`.
+- La tarjeta "Próximo descanso" del dashboard mostraba la cuenta atrás
+  congelada: `tick()` refresca cada segundo lo que haya en `counters`, pero
+  esa lista solo la llenaba `modeCard()`, una función que `onCreate` nunca
+  llama. `counters` pasa de `ArrayList<Pair<Mode, TextView>>` a
+  `ArrayList<() -> Unit>` (closures de actualización) para que cualquier
+  vista pueda registrarse, no solo las de `modeCard()`.
 
 ## v1.7 — 2026-07-30
 
@@ -74,6 +51,40 @@ flotante y sonido ambiente nuevos en la versión de escritorio.
 - `descanso` escribe `~/.config/descanso-visual/state.json` en cada ciclo del
   loop principal para que el widget pueda leer los próximos descansos sin
   acoplarse al proceso.
+
+## v1.6 — 2026-07-30
+
+Mejora de usabilidad y experiencia en la app Android: notificaciones al final
+de las pausas, configuración rediseñada, modo oscuro, animación de animal y temas personalizables.
+
+### Mejoras
+
+- **Alertas al finalizar la pausa**: vibración y sonido cuando el cronómetro
+  llega a cero, con cambio visual (timer en verde, "¡Listo! Puedes continuar").
+- **Animación de animal**: pantalla de pausa muestra perro o gato caminando en
+  frames animados (como en escritorio). Seleccionable en Configuración → Apariencia.
+- **Configuración reorganizada**: diálogo de ajustes con secciones claras
+  (Apariencia, Notificaciones, No molestar, Mensajes, Modos).
+- **Soporte para modo oscuro**: sigue el modo del sistema automáticamente,
+  con opción para forzar claro/oscuro/auto en Configuración.
+- **Botón guardar al final**: ahora está al final del diálogo de ajustes.
+- **Pantalla inicial simplificada**: diseño más limpio con secciones:
+  estado, próximo descanso, modos activos, estadísticas.
+- **Estadísticas en pantalla de pausa**: muestra racha, hoy, semana, total.
+- **Validación de datos**: comprueba duración e intervalos > 0.
+- **Feedback al guardar**: toast "✓ Configuración guardada".
+
+### Cambios técnicos
+
+- El modo oscuro se resuelve por código (`isDarkMode()`/`updateColors()` en
+  `MainActivity`/`BreakActivity`, según `Configuration.UI_MODE_NIGHT_MASK` o
+  la preferencia guardada), no vía tema de sistema: el manifest sigue fijo en
+  `Theme.Material.Light.NoActionBar`. Un intento anterior con
+  `values-night/themes.xml` se descartó por referenciar temas inexistentes.
+- `Reminder`: añade `themeMode()`, `animal()`; `saveGlobal()` actualizada.
+- `BreakActivity`: animación de frames, `vibrateEnd()`, estadísticas, colores adaptados.
+- `MainActivity`: configuración reorganizada, pantalla inicial simplificada.
+- **Recursos**: añadidos `dog_frame0-3.png` y `cat_frame0-3.png`.
 
 ## v1.4 — 2026-07-27
 
